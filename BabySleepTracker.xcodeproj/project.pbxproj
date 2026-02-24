@@ -13,6 +13,10 @@
 		FAEF104B2F4E208000E76FD4 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = FAEF104A2F4E208000E76FD4 /* Preview Assets.xcassets */; };
 		FAEF104D2F4E208000E76FD4 /* Persistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAEF104C2F4E208000E76FD4 /* Persistence.swift */; };
 		FAEF10502F4E208000E76FD4 /* BabySleepTracker.xcdatamodeld in Sources */ = {isa = PBXBuildFile; fileRef = FAEF104E2F4E208000E76FD4 /* BabySleepTracker.xcdatamodeld */; };
+		FAEF10572F4E20BC00E76FD4 /* DayDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAEF10562F4E20BC00E76FD4 /* DayDetailView.swift */; };
+		FAEF10592F4E20D600E76FD4 /* AddRecordView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAEF10582F4E20D600E76FD4 /* AddRecordView.swift */; };
+		FAEF105B2F4E210600E76FD4 /* SleepRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAEF105A2F4E210600E76FD4 /* SleepRecord.swift */; };
+		FAEF105D2F4E212F00E76FD4 /* TimeFormat.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAEF105C2F4E212F00E76FD4 /* TimeFormat.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -23,6 +27,10 @@
 		FAEF104A2F4E208000E76FD4 /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
 		FAEF104C2F4E208000E76FD4 /* Persistence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Persistence.swift; sourceTree = "<group>"; };
 		FAEF104F2F4E208000E76FD4 /* BabySleepTracker.xcdatamodel */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcdatamodel; path = BabySleepTracker.xcdatamodel; sourceTree = "<group>"; };
+		FAEF10562F4E20BC00E76FD4 /* DayDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DayDetailView.swift; sourceTree = "<group>"; };
+		FAEF10582F4E20D600E76FD4 /* AddRecordView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddRecordView.swift; sourceTree = "<group>"; };
+		FAEF105A2F4E210600E76FD4 /* SleepRecord.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepRecord.swift; sourceTree = "<group>"; };
+		FAEF105C2F4E212F00E76FD4 /* TimeFormat.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeFormat.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -55,12 +63,16 @@
 		FAEF10422F4E207F00E76FD4 /* BabySleepTracker */ = {
 			isa = PBXGroup;
 			children = (
+				FAEF10562F4E20BC00E76FD4 /* DayDetailView.swift */,
+				FAEF10582F4E20D600E76FD4 /* AddRecordView.swift */,
 				FAEF10432F4E207F00E76FD4 /* BabySleepTrackerApp.swift */,
 				FAEF10452F4E207F00E76FD4 /* ContentView.swift */,
 				FAEF10472F4E208000E76FD4 /* Assets.xcassets */,
 				FAEF104C2F4E208000E76FD4 /* Persistence.swift */,
 				FAEF104E2F4E208000E76FD4 /* BabySleepTracker.xcdatamodeld */,
 				FAEF10492F4E208000E76FD4 /* Preview Content */,
+				FAEF105A2F4E210600E76FD4 /* SleepRecord.swift */,
+				FAEF105C2F4E212F00E76FD4 /* TimeFormat.swift */,
 			);
 			path = BabySleepTracker;
 			sourceTree = "<group>";
@@ -144,6 +156,10 @@
 			buildActionMask = 2147483647;
 			files = (
 				FAEF10502F4E208000E76FD4 /* BabySleepTracker.xcdatamodeld in Sources */,
+				FAEF105B2F4E210600E76FD4 /* SleepRecord.swift in Sources */,
+				FAEF10592F4E20D600E76FD4 /* AddRecordView.swift in Sources */,
+				FAEF105D2F4E212F00E76FD4 /* TimeFormat.swift in Sources */,
+				FAEF10572F4E20BC00E76FD4 /* DayDetailView.swift in Sources */,
 				FAEF104D2F4E208000E76FD4 /* Persistence.swift in Sources */,
 				FAEF10462F4E207F00E76FD4 /* ContentView.swift in Sources */,
 				FAEF10442F4E207F00E76FD4 /* BabySleepTrackerApp.swift in Sources */,
