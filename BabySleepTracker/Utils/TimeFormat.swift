@@ -1,6 +1,6 @@
 //
 //  TimeFormat.swift
-//  SleepTracker
+//  BabySleepTracker
 //
 //  Created by MacBook on 24.02.2026.
 //

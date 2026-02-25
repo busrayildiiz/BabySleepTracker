@@ -8,7 +8,7 @@ import SwiftUI
 import Foundation
 import Charts
 
-struct ContentView: View {
+struct SleepListView: View {
     
     @State private var showingAddSheet = false
     @State private var records : [SleepRecord] = [
@@ -419,10 +419,14 @@ struct ContentView: View {
                 loadRecords()
             }
             .sheet(isPresented: $showingAddSheet) {
-                AddRecordView(defaultDate: addDefaultDate, onSave: { newRecord in
-                    records.append(newRecord)
-                    saveRecords()
-                })
+                AddRecordView(
+                    defaultDate: addDefaultDate,
+                    vm: AddRecordViewModel(),
+                    onSave: { newRecord in
+                        records.append(newRecord)
+                        saveRecords()
+                    }
+                )
             }
             .sheet(item: $selectedDay) { selected in
                 let dayRecords = records

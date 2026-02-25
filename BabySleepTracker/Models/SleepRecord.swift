@@ -30,32 +30,12 @@ struct SleepRecord: Identifiable, Codable {
         let calender = Calendar.current
 
         if calender.isDateInToday(date){
-            return "Bugün"
+            return "Today"
         }else if calender.isDateInYesterday(date){
-            return "Dün"
+            return "Yesterday"
         }else {
             return date.formatted(date: .abbreviated, time: .omitted)
         }
     }
 }
 
-enum SleepKind: String, Codable, CaseIterable, Identifiable {
-    case dayNap
-    case nightSleep
-
-    var id: String { rawValue }
-
-    var title: String {
-        switch self {
-        case .dayNap: return "Day Nap"
-        case .nightSleep: return "Night Sleep"
-        }
-    }
-
-    var icon: String {
-        switch self {
-        case .dayNap: return "sun.max"
-        case .nightSleep: return "moon.stars"
-        }
-    }
-}
