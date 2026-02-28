@@ -134,7 +134,7 @@ struct AddRecordView: View {
                         .environment(\.locale, Locale(identifier: "en_US"))
                 }
                 if vm.kind == .nightSleep {
-                    Text("Date is the start date.")
+                    Text("The selected date is the sleep start date.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                         .padding(.horizontal, 16)
@@ -148,7 +148,7 @@ struct AddRecordView: View {
                 row {
                     Text("Start")
                     Spacer()
-                    DatePicker("", selection: $selectedDate, displayedComponents: [.date])
+                    DatePicker("", selection: $startTime, displayedComponents: [.hourAndMinute])
                         .labelsHidden()
                         .datePickerStyle(.compact)
                         .environment(\.locale, Locale(identifier: "en_US"))
@@ -213,8 +213,9 @@ struct AddRecordView: View {
     }
     private var defaultEndMinutes: Int {
         switch vm.kind {
-        case .dayNap: return 60
+        case .dayNap:     return 60
         case .nightSleep: return 8 * 60
+        case .break:      return 15
         }
     }
 

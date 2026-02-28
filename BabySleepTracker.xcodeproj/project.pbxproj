@@ -21,6 +21,10 @@
 		FAEF10662F4E5A1E00E76FD4 /* SleepListViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAEF10652F4E5A1E00E76FD4 /* SleepListViewModel.swift */; };
 		FAEF10682F4E5A7200E76FD4 /* AddRecordViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAEF10672F4E5A7200E76FD4 /* AddRecordViewModel.swift */; };
 		FAEF106A2F4E5D0100E76FD4 /* DayDetailViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAEF10692F4E5D0100E76FD4 /* DayDetailViewModel.swift */; };
+		FAEF106C2F4FA0C800E76FD4 /* SegmentKind.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAEF106B2F4FA0C800E76FD4 /* SegmentKind.swift */; };
+		FAEF106E2F53066D00E76FD4 /* AddBreakView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAEF106D2F53066D00E76FD4 /* AddBreakView.swift */; };
+		FAEF10702F530D3100E76FD4 /* SleepRecordRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAEF106F2F530D3100E76FD4 /* SleepRecordRow.swift */; };
+		FAEF10722F536DB200E76FD4 /* NapPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAEF10712F536DB200E76FD4 /* NapPickerView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -39,6 +43,10 @@
 		FAEF10652F4E5A1E00E76FD4 /* SleepListViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepListViewModel.swift; sourceTree = "<group>"; };
 		FAEF10672F4E5A7200E76FD4 /* AddRecordViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddRecordViewModel.swift; sourceTree = "<group>"; };
 		FAEF10692F4E5D0100E76FD4 /* DayDetailViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DayDetailViewModel.swift; sourceTree = "<group>"; };
+		FAEF106B2F4FA0C800E76FD4 /* SegmentKind.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SegmentKind.swift; sourceTree = "<group>"; };
+		FAEF106D2F53066D00E76FD4 /* AddBreakView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddBreakView.swift; sourceTree = "<group>"; };
+		FAEF106F2F530D3100E76FD4 /* SleepRecordRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepRecordRow.swift; sourceTree = "<group>"; };
+		FAEF10712F536DB200E76FD4 /* NapPickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NapPickerView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -81,6 +89,8 @@
 				FAEF104E2F4E208000E76FD4 /* BabySleepTracker.xcdatamodeld */,
 				FAEF10492F4E208000E76FD4 /* Preview Content */,
 				FAEF10692F4E5D0100E76FD4 /* DayDetailViewModel.swift */,
+				FAEF106F2F530D3100E76FD4 /* SleepRecordRow.swift */,
+				FAEF10712F536DB200E76FD4 /* NapPickerView.swift */,
 			);
 			path = BabySleepTracker;
 			sourceTree = "<group>";
@@ -96,6 +106,7 @@
 		FAEF105E2F4E269E00E76FD4 /* Models */ = {
 			isa = PBXGroup;
 			children = (
+				FAEF106B2F4FA0C800E76FD4 /* SegmentKind.swift */,
 				FAEF105A2F4E210600E76FD4 /* SleepRecord.swift */,
 				FAEF10632F4E284100E76FD4 /* SleepKind.swift */,
 			);
@@ -105,6 +116,7 @@
 		FAEF105F2F4E26B100E76FD4 /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				FAEF106D2F53066D00E76FD4 /* AddBreakView.swift */,
 				FAEF10562F4E20BC00E76FD4 /* DayDetailView.swift */,
 				FAEF10582F4E20D600E76FD4 /* AddRecordView.swift */,
 				FAEF10452F4E207F00E76FD4 /* SleepListView.swift */,
@@ -212,12 +224,16 @@
 				FAEF105B2F4E210600E76FD4 /* SleepRecord.swift in Sources */,
 				FAEF10592F4E20D600E76FD4 /* AddRecordView.swift in Sources */,
 				FAEF105D2F4E212F00E76FD4 /* TimeFormat.swift in Sources */,
+				FAEF106C2F4FA0C800E76FD4 /* SegmentKind.swift in Sources */,
+				FAEF10722F536DB200E76FD4 /* NapPickerView.swift in Sources */,
+				FAEF106E2F53066D00E76FD4 /* AddBreakView.swift in Sources */,
 				FAEF10572F4E20BC00E76FD4 /* DayDetailView.swift in Sources */,
 				FAEF104D2F4E208000E76FD4 /* SleepStore.swift in Sources */,
 				FAEF10662F4E5A1E00E76FD4 /* SleepListViewModel.swift in Sources */,
 				FAEF10682F4E5A7200E76FD4 /* AddRecordViewModel.swift in Sources */,
 				FAEF10462F4E207F00E76FD4 /* SleepListView.swift in Sources */,
 				FAEF10642F4E284100E76FD4 /* SleepKind.swift in Sources */,
+				FAEF10702F530D3100E76FD4 /* SleepRecordRow.swift in Sources */,
 				FAEF10442F4E207F00E76FD4 /* BabySleepTrackerApp.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
