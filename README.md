@@ -22,8 +22,7 @@ BabySleepTracker
 ├── Services
 ├── Utils
 
-
-### Key Architectural Decisions
+<### Key Architectural Decisions
 
 - State-driven UI using `ObservableObject`
 - Separation of business logic from Views
@@ -60,7 +59,7 @@ BabySleepTracker
 - SwiftData / CoreData persistence upgrade
 - Sleep recommendation logic engine
 - Cloud sync support
-- Unit testing for ViewModels
+- Unit testing for ViewModels ✅
 
 ---
 
