@@ -7,6 +7,10 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		FA5488CB2FAEB831002BC18B /* SleepAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA5488CA2FAEB831002BC18B /* SleepAPI.swift */; };
+		FA5488D32FAEB964002BC18B /* BabySleepTrackerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA5488D22FAEB964002BC18B /* BabySleepTrackerTests.swift */; };
+		FA5488DA2FAEB98D002BC18B /* AddRecorViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA5488D92FAEB98D002BC18B /* AddRecorViewModelTests.swift */; };
+		FA5488DC2FAEBBD4002BC18B /* SleepAPITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA5488DB2FAEBBD4002BC18B /* SleepAPITests.swift */; };
 		FAEF10442F4E207F00E76FD4 /* BabySleepTrackerApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAEF10432F4E207F00E76FD4 /* BabySleepTrackerApp.swift */; };
 		FAEF10462F4E207F00E76FD4 /* SleepListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAEF10452F4E207F00E76FD4 /* SleepListView.swift */; };
 		FAEF10482F4E208000E76FD4 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = FAEF10472F4E208000E76FD4 /* Assets.xcassets */; };
@@ -27,7 +31,22 @@
 		FAEF10722F536DB200E76FD4 /* NapPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAEF10712F536DB200E76FD4 /* NapPickerView.swift */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		FA5488D42FAEB964002BC18B /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = FAEF10382F4E207F00E76FD4 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = FAEF103F2F4E207F00E76FD4;
+			remoteInfo = BabySleepTracker;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
+		FA5488CA2FAEB831002BC18B /* SleepAPI.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SleepAPI.swift; sourceTree = "<group>"; };
+		FA5488D02FAEB964002BC18B /* BabySleepTrackerTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = BabySleepTrackerTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		FA5488D22FAEB964002BC18B /* BabySleepTrackerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BabySleepTrackerTests.swift; sourceTree = "<group>"; };
+		FA5488D92FAEB98D002BC18B /* AddRecorViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddRecorViewModelTests.swift; sourceTree = "<group>"; };
+		FA5488DB2FAEBBD4002BC18B /* SleepAPITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepAPITests.swift; sourceTree = "<group>"; };
 		FAEF10402F4E207F00E76FD4 /* BabySleepTracker.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BabySleepTracker.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		FAEF10432F4E207F00E76FD4 /* BabySleepTrackerApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BabySleepTrackerApp.swift; sourceTree = "<group>"; };
 		FAEF10452F4E207F00E76FD4 /* SleepListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepListView.swift; sourceTree = "<group>"; };
@@ -50,6 +69,13 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		FA5488CD2FAEB964002BC18B /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		FAEF103D2F4E207F00E76FD4 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -60,10 +86,21 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		FA5488D12FAEB964002BC18B /* BabySleepTrackerTests */ = {
+			isa = PBXGroup;
+			children = (
+				FA5488D22FAEB964002BC18B /* BabySleepTrackerTests.swift */,
+				FA5488D92FAEB98D002BC18B /* AddRecorViewModelTests.swift */,
+				FA5488DB2FAEBBD4002BC18B /* SleepAPITests.swift */,
+			);
+			path = BabySleepTrackerTests;
+			sourceTree = "<group>";
+		};
 		FAEF10372F4E207F00E76FD4 = {
 			isa = PBXGroup;
 			children = (
 				FAEF10422F4E207F00E76FD4 /* BabySleepTracker */,
+				FA5488D12FAEB964002BC18B /* BabySleepTrackerTests */,
 				FAEF10412F4E207F00E76FD4 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -72,6 +109,7 @@
 			isa = PBXGroup;
 			children = (
 				FAEF10402F4E207F00E76FD4 /* BabySleepTracker.app */,
+				FA5488D02FAEB964002BC18B /* BabySleepTrackerTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -136,6 +174,7 @@
 		FAEF10612F4E26CE00E76FD4 /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				FA5488CA2FAEB831002BC18B /* SleepAPI.swift */,
 				FAEF104C2F4E208000E76FD4 /* SleepStore.swift */,
 			);
 			path = Services;
@@ -152,6 +191,24 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		FA5488CF2FAEB964002BC18B /* BabySleepTrackerTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = FA5488D62FAEB964002BC18B /* Build configuration list for PBXNativeTarget "BabySleepTrackerTests" */;
+			buildPhases = (
+				FA5488CC2FAEB964002BC18B /* Sources */,
+				FA5488CD2FAEB964002BC18B /* Frameworks */,
+				FA5488CE2FAEB964002BC18B /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				FA5488D52FAEB964002BC18B /* PBXTargetDependency */,
+			);
+			name = BabySleepTrackerTests;
+			productName = BabySleepTrackerTests;
+			productReference = FA5488D02FAEB964002BC18B /* BabySleepTrackerTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 		FAEF103F2F4E207F00E76FD4 /* BabySleepTracker */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = FAEF10532F4E208000E76FD4 /* Build configuration list for PBXNativeTarget "BabySleepTracker" */;
@@ -179,6 +236,10 @@
 				LastSwiftUpdateCheck = 1420;
 				LastUpgradeCheck = 1420;
 				TargetAttributes = {
+					FA5488CF2FAEB964002BC18B = {
+						CreatedOnToolsVersion = 14.2;
+						TestTargetID = FAEF103F2F4E207F00E76FD4;
+					};
 					FAEF103F2F4E207F00E76FD4 = {
 						CreatedOnToolsVersion = 14.2;
 					};
@@ -198,11 +259,19 @@
 			projectRoot = "";
 			targets = (
 				FAEF103F2F4E207F00E76FD4 /* BabySleepTracker */,
+				FA5488CF2FAEB964002BC18B /* BabySleepTrackerTests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		FA5488CE2FAEB964002BC18B /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		FAEF103E2F4E207F00E76FD4 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -215,12 +284,23 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		FA5488CC2FAEB964002BC18B /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				FA5488DA2FAEB98D002BC18B /* AddRecorViewModelTests.swift in Sources */,
+				FA5488DC2FAEBBD4002BC18B /* SleepAPITests.swift in Sources */,
+				FA5488D32FAEB964002BC18B /* BabySleepTrackerTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		FAEF103C2F4E207F00E76FD4 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 				FAEF106A2F4E5D0100E76FD4 /* DayDetailViewModel.swift in Sources */,
 				FAEF10502F4E208000E76FD4 /* BabySleepTracker.xcdatamodeld in Sources */,
+				FA5488CB2FAEB831002BC18B /* SleepAPI.swift in Sources */,
 				FAEF105B2F4E210600E76FD4 /* SleepRecord.swift in Sources */,
 				FAEF10592F4E20D600E76FD4 /* AddRecordView.swift in Sources */,
 				FAEF105D2F4E212F00E76FD4 /* TimeFormat.swift in Sources */,
@@ -240,7 +320,51 @@
 		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		FA5488D52FAEB964002BC18B /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = FAEF103F2F4E207F00E76FD4 /* BabySleepTracker */;
+			targetProxy = FA5488D42FAEB964002BC18B /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin XCBuildConfiguration section */
+		FA5488D72FAEB964002BC18B /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 2GF6Y44N8Z;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.BabySleepTrackerTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/BabySleepTracker.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/BabySleepTracker";
+			};
+			name = Debug;
+		};
+		FA5488D82FAEB964002BC18B /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 2GF6Y44N8Z;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.BabySleepTrackerTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/BabySleepTracker.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/BabySleepTracker";
+			};
+			name = Release;
+		};
 		FAEF10512F4E208000E76FD4 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -416,6 +540,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		FA5488D62FAEB964002BC18B /* Build configuration list for PBXNativeTarget "BabySleepTrackerTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				FA5488D72FAEB964002BC18B /* Debug */,
+				FA5488D82FAEB964002BC18B /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		FAEF103B2F4E207F00E76FD4 /* Build configuration list for PBXProject "BabySleepTracker" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (

@@ -8,9 +8,13 @@ final class SleepListViewModel: ObservableObject {
     @Published var errorMessage: String?
 
     private let store: SleepStoring
+    private let api: SleepAPI
 
-    init(store: SleepStoring = SleepStore()) {
+    init(store: SleepStoring = SleepStore(),
+         api: SleepAPI = MockSleepAPI()) {
         self.store = store
+        self.api = api
+
     }
 
     // MARK: - Lifecycle
@@ -22,11 +26,23 @@ final class SleepListViewModel: ObservableObject {
     // MARK: - Load
 
     func load() {
-        do {
-            records = try store.load()
-                .sorted { $0.date > $1.date }
-        } catch {
-            errorMessage = "Failed to load records."
+
+        Task {
+
+            do {
+
+                let data = try await api.fetchRecords()
+
+                await MainActor.run {
+                    self.records = data
+                }
+
+            } catch {
+
+                errorMessage = "Failed to load"
+
+            }
+
         }
     }
 
