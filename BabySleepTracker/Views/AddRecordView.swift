@@ -233,20 +233,16 @@ struct AddRecordView: View {
     }
 
     private func validateTimesAfterStartChange() {
-        // End <= Start ise (özellikle DayNap’te) otomatik düzelt
         if vm.kind == .dayNap, endDateTime <= startDateTime {
             applyDefaultEndFromStart()
         }
 
-        // NightSleep’te end < start durumu zaten endDateTime içinde +1 day ile çözülüyor,
-        // ama endTime tamamen aynı ana düşerse (0 dk) save disabled olur, burada istersen 8h set edebilirsin:
         if vm.kind == .nightSleep, durationMinutes <= 0, !endManuallyEdited {
             applyDefaultEndFromStart()
         }
     }
 
     private func validateTimesAfterEndChange() {
-        // DayNap’te end < start olursa 23h gibi saçma duration oluşmasın -> auto fix
         if vm.kind == .dayNap, endDateTime <= startDateTime {
             applyDefaultEndFromStart()
         }
@@ -295,7 +291,7 @@ struct AddRecordView: View {
             kindButton(.dayNap)
             kindButton(.nightSleep)
         }
-        .frame(maxWidth: .infinity)                 // ✅ satıra yay
+        .frame(maxWidth: .infinity)
         .fixedSize(horizontal: false, vertical: true)
         .background(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
@@ -318,7 +314,7 @@ struct AddRecordView: View {
                 Text(kind.title)
                     .font(.subheadline.weight(.semibold))
             }
-            .frame(maxWidth: .infinity)             // ✅ her buton yarım yarım genişler
+            .frame(maxWidth: .infinity)    
             .padding(.vertical, 12)
             .foregroundStyle(isSelected ? .white : .primary)
             .background(

@@ -459,8 +459,11 @@ struct SleepListView: View {
                 NapPickerView(naps: naps) { selectedNap in
                     selectedNapIDForBreak = selectedNap.id
                     breakDefaultDate = breakTargetDay
-                    activeSheet = .addBreak
-                }
+                    self.activeSheet = nil
+                    
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                                self.activeSheet = .addBreak
+                            }                }
 
             case .addBreak:
                 AddBreakView(

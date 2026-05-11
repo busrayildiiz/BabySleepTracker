@@ -1,6 +1,5 @@
 import SwiftUI
 
-// ✅ Parent da erişsin diye dışarıda
 enum AddMode {
     case sleep
     case `break`
@@ -70,7 +69,6 @@ struct DayDetailView: View {
         return Section {
             ForEach(Array(naps.enumerated()), id: \.element.id) { index, nap in
 
-                // ✅ Nap satırı (seçilebilir)
                 Button {
                     selectedNapID = nap.id
                 } label: {
@@ -82,7 +80,6 @@ struct DayDetailView: View {
                 }
                 .buttonStyle(.plain)
 
-                // ✅ Bu nap'e bağlı break'ler
                 let napBreaks = breaks.filter { $0.parentNapID == nap.id }
 
                 if !napBreaks.isEmpty {
