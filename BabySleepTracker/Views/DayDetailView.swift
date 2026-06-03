@@ -10,13 +10,24 @@ struct DayDetailView: View {
     let records: [SleepRecord]
 
     let onDelete: (_ ids: Set<UUID>) -> Void
-
     let onAddTap: (_ mode: AddMode, _ day: Date, _ targetNapID: UUID?) -> Void
-    
+
     @State private var showAddMenu = false
     @State private var selectedNapID: UUID? = nil
 
     @Environment(\.dismiss) private var dismiss
+
+    private var naps: [SleepRecord] {
+        records
+            .filter { $0.kind == .dayNap || $0.kind == .nightSleep }
+            .sorted { $0.date < $1.date }
+    }
+
+    private var breaks: [SleepRecord] {
+        records
+            .filter { $0.kind == .break }
+            .sorted { $0.date < $1.date }
+    }
 
     var body: some View {
         NavigationStack {
@@ -28,101 +39,50 @@ struct DayDetailView: View {
             .scrollContentBackground(.hidden)
             .background(Color(.systemGroupedBackground))
             .toolbar {
-                        ToolbarItem(placement: .navigationBarLeading) {
-                            Button("Done") { dismiss() }
-                        }
-
-                        ToolbarItem(placement: .navigationBarTrailing) {
-                            Button {
-                                showAddMenu = true
-                            } label: {
-                                Image(systemName: "plus")
-                            }
-                        }
-                    }
-            .confirmationDialog(
-                       "Add",
-                       isPresented: $showAddMenu,
-                       titleVisibility: .hidden
-                   ) {
-                       Button("Add Nap") {
-                           onAddTap(.sleep, day, nil)
-                       }
-
-                       Button("Add Break") {
-                           onAddTap(.break, day, nil)
-                       }
-
-                       Button("Cancel", role: .cancel) { }
-                   }
-        }
-    }
-    private var recordsSection: some View {
-        let naps = records
-            .filter { $0.kind == .dayNap || $0.kind == .nightSleep }
-            .sorted { $0.date < $1.date }
-
-        let breaks = records
-            .filter { $0.kind == .break }
-            .sorted { $0.date < $1.date }
-
-        return Section {
-            ForEach(Array(naps.enumerated()), id: \.element.id) { index, nap in
-
-                Button {
-                    selectedNapID = nap.id
-                } label: {
-                    NapRow(napNumber: index + 1, record: nap, breaks: breaks)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 16)
-                                .stroke(selectedNapID == nap.id ? Color.indigo.opacity(0.8) : Color.clear, lineWidth: 2)
-                        )
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Done") { dismiss() }
                 }
-                .buttonStyle(.plain)
-
-                let napBreaks = breaks.filter { $0.parentNapID == nap.id }
-
-                if !napBreaks.isEmpty {
-                    ForEach(napBreaks) { br in
-                        BreakRow(record: br)
-                            .padding(.leading, 12)  
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button { showAddMenu = true } label: {
+                        Image(systemName: "plus")
                     }
                 }
             }
+            .confirmationDialog("Add", isPresented: $showAddMenu, titleVisibility: .hidden) {
+                Button("Add Nap") { onAddTap(.sleep, day, nil) }
+                Button("Add Break") { onAddTap(.break, day, nil) }
+                Button("Cancel", role: .cancel) { }
+            }
+        }
+    }
+
+    // MARK: - Records Section
+
+    private var recordsSection: some View {
+        Section {
+            ForEach(Array(naps.enumerated()), id: \.element.id) { index, nap in
+                let napBreaks = breaks.filter { $0.parentNapID == nap.id }
+
+                NapCard(
+                    napNumber: index + 1,
+                    nap: nap,
+                    breaks: napBreaks,
+                    allBreaks: breaks,
+                    isSelected: selectedNapID == nap.id,
+                    onTap: { selectedNapID = nap.id }
+                )
+                .listRowInsets(EdgeInsets(top: 5, leading: 16, bottom: 5, trailing: 16))
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
+            }
             .onDelete { offsets in
-                // sadece nap’lerden sil
                 let ids = Set(offsets.map { naps[$0].id })
                 onDelete(ids)
             }
         }
     }
 
-    private var addActionsSection: some View {
-        Section {
-            Button {
-                onAddTap(.sleep, day, nil)
-            } label: {
-                AddActionRow(
-                    title: "Add Nap",
-                    subtitle: "Track a sleep session",
-                    systemImage: "plus.circle.fill"
-                )
-            }
-
-            Button {
-                onAddTap(.break, day, selectedNapID)
-            } label: {
-                AddActionRow(
-                    title: "Add Break",
-                    subtitle: "Track a wake window / break",
-                    systemImage: "cup.and.saucer.fill"
-                )
-            }
-        }
-        .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
-        .listRowBackground(Color.clear)
-        .listRowSeparator(.hidden)
-    }
+    // MARK: - Helpers
 
     private var dayTitle: String {
         let calendar = Calendar.current
@@ -130,19 +90,155 @@ struct DayDetailView: View {
         if calendar.isDateInYesterday(day) { return "Yesterday" }
         return day.formatted(.dateTime.day().month(.abbreviated))
     }
+}
 
-    private func delete(at offsets: IndexSet) {
-        let sorted = records.sorted { $0.date < $1.date }
+// MARK: - NapCard
 
-        var ids = Set<UUID>()
-        for index in offsets {
-            guard sorted.indices.contains(index) else { continue }
-            ids.insert(sorted[index].id)
+struct NapCard: View {
+    let napNumber: Int
+    let nap: SleepRecord
+    let breaks: [SleepRecord]
+    let allBreaks: [SleepRecord]
+    let isSelected: Bool
+    let onTap: () -> Void
+
+    private var isNight: Bool { nap.kind == .nightSleep }
+
+    private var tint: Color { isNight ? .indigo : .orange }
+
+    private var cardBg: Color {
+        isNight ? Color.indigo.opacity(0.06) : Color(.secondarySystemGroupedBackground)
+    }
+
+    private var napEnd: Date {
+        nap.date.addingTimeInterval(TimeInterval(nap.duration * 60))
+    }
+
+    private var netMinutes: Int {
+        nap.totalMinutes(breaks: allBreaks)
+    }
+
+    var body: some View {
+        Button(action: onTap) {
+            VStack(alignment: .leading, spacing: 0) {
+                // ── Nap Header Row ──────────────────────────────
+                HStack(spacing: 12) {
+                    // İkon
+                    ZStack {
+                        Circle()
+                            .fill(tint.opacity(0.12))
+                            .frame(width: 36, height: 36)
+                        Image(systemName: nap.kind.icon)
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(tint)
+                    }
+
+                    // Başlık + net süre alt satır
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(isNight ? "Night Sleep" : "\(napNumber). Nap")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.primary)
+
+                        Text("\(TimeFormat.ampm(nap.date)) — \(TimeFormat.ampm(napEnd))")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .monospacedDigit()
+                    }
+
+                    Spacer()
+
+                    // Sağ taraf: toplam süre + net süre
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text(TimeFormat.minutes(nap.duration))
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.primary)
+
+                        if !breaks.isEmpty {
+                            Text("\(TimeFormat.minutes(netMinutes)) net")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 12)
+
+     
+                if !breaks.isEmpty {
+                    
+                    Divider()
+                        .padding(.leading, 14)
+
+                    ForEach(Array(breaks.enumerated()), id: \.element.id) { i, br in
+                        BreakRowInline(record: br)
+
+                        if i < breaks.count - 1 {
+                            Divider()
+                                .padding(.leading, 62) 
+                        }
+                    }
+                }
+            }
+            .background(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(cardBg)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .stroke(
+                        isSelected ? tint.opacity(0.8) : Color.primary.opacity(0.06),
+                        lineWidth: isSelected ? 2 : 1
+                    )
+            )
         }
-
-        onDelete(ids)
+        .buttonStyle(.plain)
     }
 }
+
+// MARK: - BreakRowInline
+
+private struct BreakRowInline: View {
+    let record: SleepRecord
+
+    private var end: Date {
+        record.date.addingTimeInterval(TimeInterval(record.duration * 60))
+    }
+
+    var body: some View {
+        HStack(spacing: 12) {
+           
+            ZStack {
+                Circle()
+                    .fill(Color.mint.opacity(0.12))
+                    .frame(width: 36, height: 36)
+                Image(systemName: "eye")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(Color.mint)
+            }
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Awake Break")
+                    .font(.subheadline)
+                    .foregroundStyle(.primary)
+
+                Text("\(TimeFormat.ampm(record.date)) — \(TimeFormat.ampm(end))")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
+            }
+
+            Spacer()
+
+            Text(TimeFormat.minutes(record.duration))
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.primary)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+    }
+}
+
+// MARK: - AddActionRow (unchanged)
 
 private struct AddActionRow: View {
     let title: String
@@ -156,13 +252,8 @@ private struct AddActionRow: View {
                 .foregroundStyle(.indigo)
 
             VStack(alignment: .leading, spacing: 3) {
-                Text(title)
-                    .font(.headline)
-                    .foregroundStyle(.primary)
-
-                Text(subtitle)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                Text(title).font(.headline).foregroundStyle(.primary)
+                Text(subtitle).font(.caption).foregroundStyle(.secondary)
             }
 
             Spacer()
@@ -181,151 +272,5 @@ private struct AddActionRow: View {
                 .stroke(Color.primary.opacity(0.06), lineWidth: 1)
         )
         .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-    }
-}
-
-struct NapRow: View {
-    let napNumber: Int
-    let record: SleepRecord
-    let breaks: [SleepRecord]
-
-    private var isNight: Bool { record.kind == .nightSleep }
-    private var isBreak: Bool { record.kind == .break }
-
-    private var pillTint: Color {
-        isNight ? .indigo : (isBreak ? .indigo : .orange)
-    }
-    private var pillBg: Color { pillTint.opacity(0.12) }
-
-    private var cardBg: Color {
-        if isNight { return Color.indigo.opacity(0.06) }
-        return Color(.secondarySystemGroupedBackground)
-    }
-
-    private var end: Date {
-        let net = record.totalMinutes(breaks: breaks)
-        return record.date.addingTimeInterval(TimeInterval(record.duration * 60))
-    }
-
-    var body: some View {
-        HStack(alignment: .center, spacing: 12) {
-            cardContent
-        }
-        .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
-        .listRowBackground(Color.clear)
-        .listRowSeparator(.hidden)
-    }
-
-    private var cardContent: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            napPill
-
-            HStack(alignment: .firstTextBaseline) {
-                Text(TimeFormat.minutes(record.totalMinutes(breaks: breaks)))
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .monospacedDigit()
-
-                Spacer()
-
-                Text(TimeFormat.minutes(record.duration))
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.primary)
-            }
-        }
-        .padding(14)
-        .background(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(cardBg)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .stroke(Color.primary.opacity(0.06), lineWidth: 1)
-        )
-    }
-
-    private var pillTitle: String {
-        if isNight { return "Night" }
-        if isBreak { return "Break" }
-        return "\(napNumber). Nap"
-    }
-
-    private var napPill: some View {
-        HStack(spacing: 6) {
-            Image(systemName: record.kind.icon)
-                .font(.system(size: 11))
-                .symbolRenderingMode(.hierarchical)
-
-            Text(pillTitle)
-                .font(.caption.weight(.semibold))
-        }
-        .foregroundStyle(pillTint)
-        .padding(.horizontal, 10)
-        .padding(.vertical, 5)
-        .background(Capsule().fill(pillBg))
-    }
-}
-
-struct BreakRow: View {
-    let record: SleepRecord
-
-    private var pillTint: Color { .indigo }
-    private var pillBg: Color { pillTint.opacity(0.12) }
-    private var cardBg: Color { Color(.secondarySystemGroupedBackground) }
-
-    private var end: Date {
-        record.date.addingTimeInterval(TimeInterval(record.duration * 60))
-    }
-
-    var body: some View {
-        HStack(alignment: .center, spacing: 12) {
-            cardContent
-        }
-        .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
-        .listRowBackground(Color.clear)
-        .listRowSeparator(.hidden)
-    }
-
-    private var cardContent: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            breakPill
-
-            HStack(alignment: .firstTextBaseline) {
-                Text("\(TimeFormat.ampm(record.date)) — \(TimeFormat.ampm(end))")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .monospacedDigit()
-
-                Spacer()
-
-                Text(TimeFormat.minutes(record.duration))
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.primary)
-            }
-        }
-        .padding(14)
-        .background(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(cardBg)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .stroke(Color.primary.opacity(0.06), lineWidth: 1)
-        )
-    }
-
-    private var breakPill: some View {
-        HStack(spacing: 6) {
-            Image(systemName: "cup.and.saucer.fill")
-                .font(.system(size: 11))
-                .symbolRenderingMode(.hierarchical)
-
-            Text("Break")
-                .font(.caption.weight(.semibold))
-        }
-        .foregroundStyle(pillTint)
-        .padding(.horizontal, 10)
-        .padding(.vertical, 5)
-        .background(Capsule().fill(pillBg))
     }
 }
