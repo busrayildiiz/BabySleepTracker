@@ -28,7 +28,12 @@ struct SleepRecord: Identifiable, Codable {
             self.parentNapID = parentNapID
         }
     
-    
+    func totalMinutes(breaks: [SleepRecord]) -> Int {
+        let totalBreak = breaks
+            .filter { $0.parentNapID == self.id && $0.kind == .break }
+            .reduce(0) { $0 + $1.duration }
+        return max(0, self.duration - totalBreak)
+    }
     
     var formattedDuration : String {
         let hours = duration / 60

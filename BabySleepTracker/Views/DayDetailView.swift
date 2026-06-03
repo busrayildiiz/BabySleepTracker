@@ -72,7 +72,7 @@ struct DayDetailView: View {
                 Button {
                     selectedNapID = nap.id
                 } label: {
-                    NapRow(napNumber: index + 1, record: nap)
+                    NapRow(napNumber: index + 1, record: nap, breaks: breaks)
                         .overlay(
                             RoundedRectangle(cornerRadius: 16)
                                 .stroke(selectedNapID == nap.id ? Color.indigo.opacity(0.8) : Color.clear, lineWidth: 2)
@@ -85,7 +85,7 @@ struct DayDetailView: View {
                 if !napBreaks.isEmpty {
                     ForEach(napBreaks) { br in
                         BreakRow(record: br)
-                            .padding(.leading, 12)  // içeri girsin
+                            .padding(.leading, 12)  
                     }
                 }
             }
@@ -187,6 +187,7 @@ private struct AddActionRow: View {
 struct NapRow: View {
     let napNumber: Int
     let record: SleepRecord
+    let breaks: [SleepRecord]
 
     private var isNight: Bool { record.kind == .nightSleep }
     private var isBreak: Bool { record.kind == .break }
@@ -202,7 +203,8 @@ struct NapRow: View {
     }
 
     private var end: Date {
-        record.date.addingTimeInterval(TimeInterval(record.duration * 60))
+        let net = record.totalMinutes(breaks: breaks)
+        return record.date.addingTimeInterval(TimeInterval(record.duration * 60))
     }
 
     var body: some View {
@@ -219,7 +221,7 @@ struct NapRow: View {
             napPill
 
             HStack(alignment: .firstTextBaseline) {
-                Text("\(TimeFormat.ampm(record.date)) — \(TimeFormat.ampm(end))")
+                Text(TimeFormat.minutes(record.totalMinutes(breaks: breaks)))
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .monospacedDigit()
@@ -297,8 +299,8 @@ struct BreakRow: View {
                 Spacer()
 
                 Text(TimeFormat.minutes(record.duration))
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.primary)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.primary)
             }
         }
         .padding(14)

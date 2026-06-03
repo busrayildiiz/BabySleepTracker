@@ -11,8 +11,14 @@ struct DayDetailViewModel {
 
     let records: [SleepRecord]
 
-    var totalMinutes: Int {
-        records.map(\.duration).reduce(0, +)
+    var totalMinutes: Int
+    
+    func totalMinutes(for nap: SleepRecord, in records: [SleepRecord]) -> Int {
+        let breaks = records.filter {
+            $0.parentNapID == nap.id && $0.kind == .break
+        }
+        let totalBreak = breaks.reduce(0) { $0 + $1.duration }
+        return nap.duration - totalBreak  
     }
 
     var formattedTotal: String {

@@ -91,21 +91,21 @@ struct SleepListView: View {
 
     private var todayTotal: Int {
         let calendar = Calendar.current
-        return records
-            .filter { calendar.isDateInToday($0.date) }
-            .map { $0.duration }
-            .reduce(0, +)
+        let todayRecords = records.filter { calendar.isDateInToday($0.date) }
+        return totalMinutes(for: todayRecords)
     }
 
     private var last7DaysAverage: Int {
         let calendar = Calendar.current
         let sevenDaysAgo = calendar.date(byAdding: .day, value: -7, to: Date())!
+        let lastWeekRecords = records.filter { $0.date >= sevenDaysAgo }
+        guard !lastWeekRecords.isEmpty else { return 0 }
 
-        let lastWeek = records.filter { $0.date >= sevenDaysAgo }
-        guard !lastWeek.isEmpty else { return 0 }
-
-        let total = lastWeek.map { $0.duration }.reduce(0, +)
-        return total / 7
+        let grouped = Dictionary(grouping: lastWeekRecords) {
+            calendar.startOfDay(for: $0.date)
+        }
+        let dailyTotals = grouped.values.map { totalMinutes(for: Array($0)) }
+        return dailyTotals.reduce(0, +) / 7
     }
 
     private var last7DaysData: [DailySleep] {
@@ -115,10 +115,8 @@ struct SleepListView: View {
         return (0..<7).reversed().map { offset in
             let day = calendar.date(byAdding: .day, value: -offset, to: today)!
 
-            let total = records
-                .filter { calendar.isDate($0.date, inSameDayAs: day) }
-                .map { $0.duration }
-                .reduce(0, +)
+            let dayRecords = records.filter { calendar.isDate($0.date, inSameDayAs: day) }
+            let total = totalMinutes(for: dayRecords)
 
             return DailySleep(date: day, totalMinutes: total)
         }
@@ -224,12 +222,7 @@ struct SleepListView: View {
 
     private func hoursLabel(from minutes: Int) -> String? {
         guard minutes > 0 else { return nil }
-        let hours = Double(minutes) / 60.0
-
-        if hours >= 1, abs(hours - round(hours)) < 0.0001 {
-            return "\(Int(round(hours)))h"
-        }
-        return String(format: "%.1fh", hours)
+        return TimeFormat.minutes(minutes)
     }
 
     private func dayTitle(_ day: Date) -> String {
@@ -240,7 +233,9 @@ struct SleepListView: View {
     }
 
     private func totalMinutes(for items: [SleepRecord]) -> Int {
-        items.map { $0.duration }.reduce(0, +)
+        let naps = items.filter { $0.kind != .break }
+        let breaks = items.filter { $0.kind == .break }
+        return naps.reduce(0) { $0 + $1.totalMinutes(breaks: breaks) }
     }
 
     private func isToday(_ day: Date) -> Bool {
@@ -345,7 +340,7 @@ struct SleepListView: View {
                         } label: {
                             DayRowCard(
                                 title: dayTitle(group.day),
-                                sessionCount: group.items.count,
+                                sessionCount: group.items.filter { $0.kind != .break }.count,
                                 totalText: TimeFormat.minutes(totalMinutes(for: group.items)),
                                 highlightToday: isToday(group.day)
                             )
