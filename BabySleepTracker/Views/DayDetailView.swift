@@ -31,13 +31,30 @@ struct DayDetailView: View {
 
     var body: some View {
         NavigationStack {
-            List {
-                recordsSection
+            ScrollView {
+                VStack(spacing: 0) {
+                    ForEach(Array(naps.enumerated()), id: \.element.id) { index, nap in
+                        let napBreaks = breaks
+                            .filter { $0.parentNapID == nap.id }
+                            .sorted { $0.date < $1.date }
+
+                        NapTimelineSection(
+                            napNumber: index + 1,
+                            nap: nap,
+                            breaks: napBreaks,
+                            allBreaks: breaks,
+                            isSelected: selectedNapID == nap.id,
+                            onNapTap: { selectedNapID = nap.id }
+                        )
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 12)
+                .padding(.bottom, 24)
             }
+            .background(Color(.systemGroupedBackground))
             .navigationTitle(dayTitle)
             .navigationBarTitleDisplayMode(.inline)
-            .scrollContentBackground(.hidden)
-            .background(Color(.systemGroupedBackground))
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Done") { dismiss() }
@@ -54,150 +71,187 @@ struct DayDetailView: View {
                 Button("Cancel", role: .cancel) { }
             }
         }
+        .tint(.indigo)
     }
-
-    // MARK: - Records Section
-
-    private var recordsSection: some View {
-        Section {
-            ForEach(Array(naps.enumerated()), id: \.element.id) { index, nap in
-                let napBreaks = breaks.filter { $0.parentNapID == nap.id }
-
-                NapCard(
-                    napNumber: index + 1,
-                    nap: nap,
-                    breaks: napBreaks,
-                    allBreaks: breaks,
-                    isSelected: selectedNapID == nap.id,
-                    onTap: { selectedNapID = nap.id }
-                )
-                .listRowInsets(EdgeInsets(top: 5, leading: 16, bottom: 5, trailing: 16))
-                .listRowBackground(Color.clear)
-                .listRowSeparator(.hidden)
-            }
-            .onDelete { offsets in
-                let ids = Set(offsets.map { naps[$0].id })
-                onDelete(ids)
-            }
-        }
-    }
-
-    // MARK: - Helpers
 
     private var dayTitle: String {
-        let calendar = Calendar.current
-        if calendar.isDateInToday(day) { return "Today" }
-        if calendar.isDateInYesterday(day) { return "Yesterday" }
+        let cal = Calendar.current
+        if cal.isDateInToday(day) { return "Today" }
+        if cal.isDateInYesterday(day) { return "Yesterday" }
         return day.formatted(.dateTime.day().month(.abbreviated))
     }
 }
 
-// MARK: - NapCard
+// MARK: - NapTimelineSection
 
-struct NapCard: View {
+struct NapTimelineSection: View {
     let napNumber: Int
     let nap: SleepRecord
     let breaks: [SleepRecord]
     let allBreaks: [SleepRecord]
     let isSelected: Bool
-    let onTap: () -> Void
+    let onNapTap: () -> Void
 
     private var isNight: Bool { nap.kind == .nightSleep }
+    private var napTint: Color { isNight ? Color.indigo : Color.orange }
+    private var napBg: Color { napTint.opacity(0.10) }
 
-    private var tint: Color { isNight ? .indigo : .orange }
-
-    private var cardBg: Color {
-        isNight ? Color.indigo.opacity(0.06) : Color(.secondarySystemGroupedBackground)
-    }
+    private var netMinutes: Int { nap.totalMinutes(breaks: allBreaks) }
 
     private var napEnd: Date {
         nap.date.addingTimeInterval(TimeInterval(nap.duration * 60))
     }
 
-    private var netMinutes: Int {
-        nap.totalMinutes(breaks: allBreaks)
-    }
-
     var body: some View {
-        Button(action: onTap) {
-            VStack(alignment: .leading, spacing: 0) {
-                // ── Nap Header Row ──────────────────────────────
-                HStack(spacing: 12) {
-                    // İkon
+        VStack(spacing: 0) {
+            // ── Nap Card ──
+            Button(action: onNapTap) {
+                HStack(spacing: 14) {
                     ZStack {
-                        Circle()
-                            .fill(tint.opacity(0.12))
-                            .frame(width: 36, height: 36)
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .fill(napTint.opacity(0.18))
+                            .frame(width: 52, height: 52)
                         Image(systemName: nap.kind.icon)
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(tint)
+                            .font(.system(size: 22, weight: .semibold))
+                            .foregroundStyle(napTint)
                     }
 
-                    // Başlık + net süre alt satır
-                    VStack(alignment: .leading, spacing: 2) {
+                    VStack(alignment: .leading, spacing: 3) {
                         Text(isNight ? "Night Sleep" : "\(napNumber). Nap")
-                            .font(.subheadline.weight(.semibold))
+                            .font(.headline)
                             .foregroundStyle(.primary)
 
-                        Text("\(TimeFormat.ampm(nap.date)) — \(TimeFormat.ampm(napEnd))")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .monospacedDigit()
+                        if !breaks.isEmpty {
+                            Text("\(TimeFormat.minutes(netMinutes)) net sleep")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        } else {
+                            Text("\(TimeFormat.ampm(nap.date)) — \(TimeFormat.ampm(napEnd))")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                                .monospacedDigit()
+                        }
                     }
 
                     Spacer()
 
-                    // Sağ taraf: toplam süre + net süre
-                    VStack(alignment: .trailing, spacing: 2) {
+                    HStack(spacing: 6) {
                         Text(TimeFormat.minutes(nap.duration))
-                            .font(.subheadline.weight(.semibold))
+                            .font(.headline.weight(.semibold))
                             .foregroundStyle(.primary)
-
-                        if !breaks.isEmpty {
-                            Text("\(TimeFormat.minutes(netMinutes)) net")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
                     }
                 }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 12)
-
-     
-                if !breaks.isEmpty {
-                    
-                    Divider()
-                        .padding(.leading, 14)
-
-                    ForEach(Array(breaks.enumerated()), id: \.element.id) { i, br in
-                        BreakRowInline(record: br)
-
-                        if i < breaks.count - 1 {
-                            Divider()
-                                .padding(.leading, 62) 
-                        }
-                    }
-                }
+                .padding(14)
+                .background(
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .fill(napBg)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .stroke(
+                            isSelected ? napTint.opacity(0.7) : Color.primary.opacity(0.06),
+                            lineWidth: isSelected ? 2 : 1
+                        )
+                )
             }
-            .background(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .fill(cardBg)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .stroke(
-                        isSelected ? tint.opacity(0.8) : Color.primary.opacity(0.06),
-                        lineWidth: isSelected ? 2 : 1
+            .buttonStyle(.plain)
+
+            // ── Break'ler varsa timeline ──
+            if !breaks.isEmpty {
+                ForEach(Array(breaks.enumerated()), id: \.element.id) { i, br in
+                    TimelineConnector(
+                        topColor: i == 0 ? napTint : Color.indigo.opacity(0.5),
+                        bottomColor: Color.indigo.opacity(0.5),
+                        isDashed: i > 0
                     )
-            )
+                    BreakCard(record: br)
+                }
+
+                infoBanner
+                    .padding(.top, 16)
+            }
         }
-        .buttonStyle(.plain)
+        .padding(.bottom, 20)
+    }
+
+    private var infoBanner: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "info.circle")
+                .font(.system(size: 15))
+                .foregroundStyle(.indigo.opacity(0.7))
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Breaks are part of this nap.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                Text("They don't affect your total nap duration.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(Color.indigo.opacity(0.06))
+        )
     }
 }
 
-// MARK: - BreakRowInline
+// MARK: - TimelineConnector
 
-private struct BreakRowInline: View {
+private struct TimelineConnector: View {
+    let topColor: Color
+    let bottomColor: Color
+    var isDashed: Bool = false
+
+    var body: some View {
+        HStack(spacing: 0) {
+            // İkon merkezine hizalı: padding(14) + icon(52)/2 = 40
+            Spacer().frame(width: 40)
+
+            VStack(spacing: 0) {
+                Circle()
+                    .fill(topColor)
+                    .frame(width: 8, height: 8)
+
+                if isDashed {
+                    VStack(spacing: 4) {
+                        ForEach(0..<5, id: \.self) { _ in
+                            RoundedRectangle(cornerRadius: 1)
+                                .fill(bottomColor)
+                                .frame(width: 2, height: 4)
+                        }
+                    }
+                    .frame(height: 32)
+                } else {
+                    Rectangle()
+                        .fill(
+                            LinearGradient(
+                                colors: [topColor, bottomColor],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
+                        .frame(width: 2, height: 32)
+                }
+
+                Circle()
+                    .strokeBorder(bottomColor, lineWidth: 2)
+                    .background(Circle().fill(Color(.systemGroupedBackground)))
+                    .frame(width: 8, height: 8)
+            }
+
+            Spacer()
+        }
+    }
+}
+
+// MARK: - BreakCard
+
+private struct BreakCard: View {
     let record: SleepRecord
 
     private var end: Date {
@@ -205,72 +259,42 @@ private struct BreakRowInline: View {
     }
 
     var body: some View {
-        HStack(spacing: 12) {
-           
+        HStack(spacing: 14) {
             ZStack {
-                Circle()
-                    .fill(Color.mint.opacity(0.12))
-                    .frame(width: 36, height: 36)
-                Image(systemName: "eye")
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(Color.mint)
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(Color.indigo.opacity(0.12))
+                    .frame(width: 52, height: 52)
+                Image(systemName: "cup.and.saucer.fill")
+                    .font(.system(size: 20, weight: .medium))
+                    .foregroundStyle(Color.indigo)
             }
 
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Awake Break")
-                    .font(.subheadline)
+            VStack(alignment: .leading, spacing: 3) {
+                Text("Break")
+                    .font(.headline)
                     .foregroundStyle(.primary)
-
-                Text("\(TimeFormat.ampm(record.date)) — \(TimeFormat.ampm(end))")
-                    .font(.caption)
+                Text("\(TimeFormat.ampm(record.date)) – \(TimeFormat.ampm(end))")
+                    .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .monospacedDigit()
             }
 
             Spacer()
 
-            Text(TimeFormat.minutes(record.duration))
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.primary)
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
-    }
-}
-
-// MARK: - AddActionRow (unchanged)
-
-private struct AddActionRow: View {
-    let title: String
-    let subtitle: String
-    let systemImage: String
-
-    var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: systemImage)
-                .font(.system(size: 18, weight: .semibold))
-                .foregroundStyle(.indigo)
-
-            VStack(alignment: .leading, spacing: 3) {
-                Text(title).font(.headline).foregroundStyle(.primary)
-                Text(subtitle).font(.caption).foregroundStyle(.secondary)
+            HStack(spacing: 6) {
+                Text(TimeFormat.minutes(record.duration))
+                    .font(.headline.weight(.semibold))
+                    .foregroundStyle(.primary)
             }
-
-            Spacer()
-
-            Image(systemName: "chevron.right")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.tertiary)
         }
         .padding(14)
         .background(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
                 .fill(Color(.secondarySystemGroupedBackground))
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
                 .stroke(Color.primary.opacity(0.06), lineWidth: 1)
         )
-        .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 }
