@@ -7,44 +7,55 @@ enum AddMode {
 
 struct DayDetailView: View {
     let day: Date
-    let records: [SleepRecord]
+    var records: [SleepRecord]
 
     let onDelete: (_ ids: Set<UUID>) -> Void
-    let onAddTap: (_ mode: AddMode, _ day: Date, _ targetNapID: UUID?) -> Void
+    let onAddSleep: (_ day: Date) -> Void
+    let onBreakSaved: (_ newBreak: SleepRecord) -> Void
 
     @State private var showAddMenu = false
     @State private var selectedNapID: UUID? = nil
+    @State private var contextNap: SleepRecord? = nil
+    @State private var showNapActions = false
+    @State private var showAddBreak = false
+    @State private var breakTargetNapID: UUID? = nil
 
     @Environment(\.dismiss) private var dismiss
 
-    private var naps: [SleepRecord] {
-        records
-            .filter { $0.kind == .dayNap || $0.kind == .nightSleep }
-            .sorted { $0.date < $1.date }
+    private var sortedNaps: [SleepRecord] {
+        let dayNaps = records.filter { $0.kind == .dayNap }.sorted { $0.date < $1.date }
+        let nightSleeps = records.filter { $0.kind == .nightSleep }.sorted { $0.date < $1.date }
+        return dayNaps + nightSleeps
     }
 
     private var breaks: [SleepRecord] {
-        records
-            .filter { $0.kind == .break }
-            .sorted { $0.date < $1.date }
+        records.filter { $0.kind == .break }.sorted { $0.date < $1.date }
     }
 
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 0) {
-                    ForEach(Array(naps.enumerated()), id: \.element.id) { index, nap in
+                VStack(spacing: 12) {
+                    ForEach(Array(sortedNaps.enumerated()), id: \.element.id) { index, nap in
                         let napBreaks = breaks
                             .filter { $0.parentNapID == nap.id }
                             .sorted { $0.date < $1.date }
 
+                        let napNumber = nap.kind == .dayNap
+                            ? sortedNaps.prefix(index + 1).filter { $0.kind == .dayNap }.count
+                            : 0
+
                         NapTimelineSection(
-                            napNumber: index + 1,
+                            napNumber: napNumber,
                             nap: nap,
                             breaks: napBreaks,
                             allBreaks: breaks,
                             isSelected: selectedNapID == nap.id,
-                            onNapTap: { selectedNapID = nap.id }
+                            onNapTap: { selectedNapID = nap.id },
+                            onLongPress: {
+                                contextNap = nap
+                                showNapActions = true
+                            }
                         )
                     }
                 }
@@ -66,9 +77,34 @@ struct DayDetailView: View {
                 }
             }
             .confirmationDialog("Add", isPresented: $showAddMenu, titleVisibility: .hidden) {
-                Button("Add Nap") { onAddTap(.sleep, day, nil) }
-                Button("Add Break") { onAddTap(.break, day, nil) }
+                Button("Add Nap") { onAddSleep(day) }
                 Button("Cancel", role: .cancel) { }
+            }
+            .confirmationDialog(
+                contextNap.map { $0.kind == .nightSleep ? "Night Sleep" : "Nap" } ?? "",
+                isPresented: $showNapActions,
+                titleVisibility: .visible
+            ) {
+                Button("Add Break") {
+                    breakTargetNapID = contextNap?.id
+                    showAddBreak = true
+                }
+                Button("Delete", role: .destructive) {
+                    if let nap = contextNap {
+                        onDelete([nap.id])
+                    }
+                }
+                Button("Cancel", role: .cancel) { contextNap = nil }
+            }
+            // AddBreakView DayDetailView içinden açılıyor
+            .sheet(isPresented: $showAddBreak) {
+                AddBreakView(
+                    defaultDate: day,
+                    targetNapID: breakTargetNapID,
+                    onSave: { newBreak in
+                        onBreakSaved(newBreak)
+                    }
+                )
             }
         }
         .tint(.indigo)
@@ -91,21 +127,23 @@ struct NapTimelineSection: View {
     let allBreaks: [SleepRecord]
     let isSelected: Bool
     let onNapTap: () -> Void
+    let onLongPress: () -> Void
 
     private var isNight: Bool { nap.kind == .nightSleep }
     private var napTint: Color { isNight ? Color.indigo : Color.orange }
-    private var napBg: Color { napTint.opacity(0.10) }
-
     private var netMinutes: Int { nap.totalMinutes(breaks: allBreaks) }
-
     private var napEnd: Date {
         nap.date.addingTimeInterval(TimeInterval(nap.duration * 60))
+    }
+    private var title: String {
+        isNight ? "Night Sleep" : "\(napNumber). Nap"
     }
 
     var body: some View {
         VStack(spacing: 0) {
-            // ── Nap Card ──
-            Button(action: onNapTap) {
+            VStack(spacing: 0) {
+
+                // Nap header — seçim highlight sadece bu row'da
                 HStack(spacing: 14) {
                     ZStack {
                         RoundedRectangle(cornerRadius: 14, style: .continuous)
@@ -117,7 +155,7 @@ struct NapTimelineSection: View {
                     }
 
                     VStack(alignment: .leading, spacing: 3) {
-                        Text(isNight ? "Night Sleep" : "\(napNumber). Nap")
+                        Text(title)
                             .font(.headline)
                             .foregroundStyle(.primary)
 
@@ -139,119 +177,124 @@ struct NapTimelineSection: View {
                         Text(TimeFormat.minutes(nap.duration))
                             .font(.headline.weight(.semibold))
                             .foregroundStyle(.primary)
+                        Image(systemName: "chevron.right")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.tertiary)
                     }
                 }
                 .padding(14)
                 .background(
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .fill(napBg)
+                    isSelected
+                        ? AnyView(
+                            napTint.opacity(0.08)
+                                .clipShape(
+                                    RoundedCorners(
+                                        tl: 18, tr: 18,
+                                        bl: breaks.isEmpty ? 18 : 0,
+                                        br: breaks.isEmpty ? 18 : 0
+                                    )
+                                )
+                          )
+                        : AnyView(Color.clear)
                 )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .stroke(
-                            isSelected ? napTint.opacity(0.7) : Color.primary.opacity(0.06),
-                            lineWidth: isSelected ? 2 : 1
-                        )
-                )
-            }
-            .buttonStyle(.plain)
-
-            // ── Break'ler varsa timeline ──
-            if !breaks.isEmpty {
-                ForEach(Array(breaks.enumerated()), id: \.element.id) { i, br in
-                    TimelineConnector(
-                        topColor: i == 0 ? napTint : Color.indigo.opacity(0.5),
-                        bottomColor: Color.indigo.opacity(0.5),
-                        isDashed: i > 0
-                    )
-                    BreakCard(record: br)
+                .contentShape(Rectangle())
+                .onTapGesture { onNapTap() }
+                .onLongPressGesture(minimumDuration: 0.4) {
+                    let impact = UIImpactFeedbackGenerator(style: .medium)
+                    impact.impactOccurred()
+                    onLongPress()
                 }
 
-                infoBanner
-                    .padding(.top, 16)
+                // Break'ler
+                if !breaks.isEmpty {
+                    ForEach(Array(breaks.enumerated()), id: \.element.id) { i, br in
+                        // Connector — ikon merkezi: padding(14) + iconWidth(52)/2 = 40pt
+                        HStack(spacing: 0) {
+                            // Sol boşluk: 14(padding) + 52/2 - 1(çizgi yarısı) = 39
+                            Color.clear.frame(width: 39)
+
+                            VStack(spacing: 0) {
+                                Circle()
+                                    .fill(i == 0 ? napTint : Color.indigo.opacity(0.4))
+                                    .frame(width: 7, height: 7)
+
+                                if i == 0 {
+                                    Rectangle()
+                                        .fill(
+                                            LinearGradient(
+                                                colors: [napTint, Color.indigo.opacity(0.5)],
+                                                startPoint: .top,
+                                                endPoint: .bottom
+                                            )
+                                        )
+                                        .frame(width: 2, height: 20)
+                                } else {
+                                    VStack(spacing: 3) {
+                                        ForEach(0..<4, id: \.self) { _ in
+                                            RoundedRectangle(cornerRadius: 1)
+                                                .fill(Color.indigo.opacity(0.4))
+                                                .frame(width: 2, height: 4)
+                                        }
+                                    }
+                                    .frame(height: 20)
+                                }
+
+                                Circle()
+                                    .strokeBorder(Color.indigo.opacity(0.5), lineWidth: 2)
+                                    .background(Circle().fill(Color(.systemBackground)))
+                                    .frame(width: 7, height: 7)
+                            }
+                            .frame(width: 2, alignment: .center)
+
+                            Spacer()
+                        }
+                        .frame(maxWidth: .infinity)
+
+                        BreakRowInCard(record: br)
+                    }
+
+                    Spacer().frame(height: 4)
+                }
+            }
+            .background(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .fill(Color(.systemBackground))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .stroke(Color.primary.opacity(0.06), lineWidth: 1)
+            )
+            .shadow(color: Color.black.opacity(0.04), radius: 8, x: 0, y: 2)
+
+            // Info banner — sadece kartın altında, bir kez
+            if !breaks.isEmpty {
+                infoBanner.padding(.top, 10)
             }
         }
-        .padding(.bottom, 20)
     }
 
     private var infoBanner: some View {
         HStack(spacing: 10) {
             Image(systemName: "info.circle")
-                .font(.system(size: 15))
-                .foregroundStyle(.indigo.opacity(0.7))
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Breaks are part of this nap.")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                Text("They don't affect your total nap duration.")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-            }
-
+                .font(.system(size: 14))
+                .foregroundStyle(.indigo.opacity(0.6))
+            Text("Breaks are part of this nap. They don't affect your total nap duration.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
             Spacer()
         }
         .padding(.horizontal, 14)
-        .padding(.vertical, 12)
+        .padding(.vertical, 10)
         .background(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .fill(Color.indigo.opacity(0.06))
         )
     }
 }
 
-// MARK: - TimelineConnector
+// MARK: - BreakRowInCard
 
-private struct TimelineConnector: View {
-    let topColor: Color
-    let bottomColor: Color
-    var isDashed: Bool = false
-
-    var body: some View {
-        HStack(spacing: 0) {
-            // İkon merkezine hizalı: padding(14) + icon(52)/2 = 40
-            Spacer().frame(width: 40)
-
-            VStack(spacing: 0) {
-                Circle()
-                    .fill(topColor)
-                    .frame(width: 8, height: 8)
-
-                if isDashed {
-                    VStack(spacing: 4) {
-                        ForEach(0..<5, id: \.self) { _ in
-                            RoundedRectangle(cornerRadius: 1)
-                                .fill(bottomColor)
-                                .frame(width: 2, height: 4)
-                        }
-                    }
-                    .frame(height: 32)
-                } else {
-                    Rectangle()
-                        .fill(
-                            LinearGradient(
-                                colors: [topColor, bottomColor],
-                                startPoint: .top,
-                                endPoint: .bottom
-                            )
-                        )
-                        .frame(width: 2, height: 32)
-                }
-
-                Circle()
-                    .strokeBorder(bottomColor, lineWidth: 2)
-                    .background(Circle().fill(Color(.systemGroupedBackground)))
-                    .frame(width: 8, height: 8)
-            }
-
-            Spacer()
-        }
-    }
-}
-
-// MARK: - BreakCard
-
-private struct BreakCard: View {
+private struct BreakRowInCard: View {
     let record: SleepRecord
 
     private var end: Date {
@@ -261,14 +304,13 @@ private struct BreakCard: View {
     var body: some View {
         HStack(spacing: 14) {
             ZStack {
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(Color.indigo.opacity(0.12))
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(Color.indigo.opacity(0.10))
                     .frame(width: 52, height: 52)
                 Image(systemName: "cup.and.saucer.fill")
-                    .font(.system(size: 20, weight: .medium))
+                    .font(.system(size: 18, weight: .medium))
                     .foregroundStyle(Color.indigo)
             }
-
             VStack(alignment: .leading, spacing: 3) {
                 Text("Break")
                     .font(.headline)
@@ -285,16 +327,40 @@ private struct BreakCard: View {
                 Text(TimeFormat.minutes(record.duration))
                     .font(.headline.weight(.semibold))
                     .foregroundStyle(.primary)
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.tertiary)
             }
         }
-        .padding(14)
-        .background(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(Color(.secondarySystemGroupedBackground))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .stroke(Color.primary.opacity(0.06), lineWidth: 1)
-        )
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+    }
+}
+
+// MARK: - RoundedCorners (iOS 16 uyumlu köşe kontrolü)
+
+private struct RoundedCorners: Shape {
+    var tl: CGFloat = 0
+    var tr: CGFloat = 0
+    var bl: CGFloat = 0
+    var br: CGFloat = 0
+
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        path.move(to: CGPoint(x: rect.minX + tl, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.maxX - tr, y: rect.minY))
+        path.addArc(center: CGPoint(x: rect.maxX - tr, y: rect.minY + tr),
+                    radius: tr, startAngle: .degrees(-90), endAngle: .degrees(0), clockwise: false)
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY - br))
+        path.addArc(center: CGPoint(x: rect.maxX - br, y: rect.maxY - br),
+                    radius: br, startAngle: .degrees(0), endAngle: .degrees(90), clockwise: false)
+        path.addLine(to: CGPoint(x: rect.minX + bl, y: rect.maxY))
+        path.addArc(center: CGPoint(x: rect.minX + bl, y: rect.maxY - bl),
+                    radius: bl, startAngle: .degrees(90), endAngle: .degrees(180), clockwise: false)
+        path.addLine(to: CGPoint(x: rect.minX, y: rect.minY + tl))
+        path.addArc(center: CGPoint(x: rect.minX + tl, y: rect.minY + tl),
+                    radius: tl, startAngle: .degrees(180), endAngle: .degrees(270), clockwise: false)
+        path.closeSubpath()
+        return path
     }
 }

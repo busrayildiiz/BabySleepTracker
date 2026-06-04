@@ -1,10 +1,3 @@
-//
-//  SleepListView.swift
-//  BabyTracker
-//
-//  Created by MacBook on 21.01.2026.
-//
-
 import SwiftUI
 import Foundation
 import Charts
@@ -19,14 +12,12 @@ struct SleepListView: View {
 
     enum ActiveSheet: Identifiable {
         case addSleep
-        case pickNapForBreak
         case addBreak
         case dayDetail(SelectedDay)
 
         var id: String {
             switch self {
             case .addSleep: return "addSleep"
-            case .pickNapForBreak: return "pickNapForBreak"
             case .addBreak: return "addBreak"
             case .dayDetail(let d): return "dayDetail-\(d.id)"
             }
@@ -34,26 +25,15 @@ struct SleepListView: View {
     }
 
     @State private var activeSheet: ActiveSheet? = nil
-
-    // MARK: - Data
-    @State private var records: [SleepRecord] = [
-        SleepRecord(date: Date(), duration: 90),
-        SleepRecord(date: Date().addingTimeInterval(-86400), duration: 120),
-        SleepRecord(date: Date().addingTimeInterval(-86400), duration: 120)
-    ]
-
-    // MARK: - UI state
+    @State private var records: [SleepRecord] = []
     @State private var animateChart = false
-
-    // Add Sleep
     @State private var addDefaultDate: Date = Date()
-
-    // Add Break
     @State private var breakDefaultDate: Date = Date()
     @State private var breakTargetDay: Date = Date()
     @State private var selectedNapIDForBreak: UUID? = nil
 
     // MARK: - Persistence
+
     private func saveRecords() {
         if let encoded = try? JSONEncoder().encode(records) {
             UserDefaults.standard.set(encoded, forKey: "sleepRecords")
@@ -68,6 +48,7 @@ struct SleepListView: View {
     }
 
     // MARK: - Derived data
+
     private var sortedRecords: [SleepRecord] {
         records.sorted { $0.date > $1.date }
     }
@@ -77,7 +58,6 @@ struct SleepListView: View {
         let groups = Dictionary(grouping: records) { record in
             calendar.startOfDay(for: record.date)
         }
-
         return groups
             .map { (day: $0.key, items: $0.value.sorted { $0.date > $1.date }) }
             .sorted { $0.day > $1.day }
@@ -100,7 +80,6 @@ struct SleepListView: View {
         let sevenDaysAgo = calendar.date(byAdding: .day, value: -7, to: Date())!
         let lastWeekRecords = records.filter { $0.date >= sevenDaysAgo }
         guard !lastWeekRecords.isEmpty else { return 0 }
-
         let grouped = Dictionary(grouping: lastWeekRecords) {
             calendar.startOfDay(for: $0.date)
         }
@@ -111,118 +90,17 @@ struct SleepListView: View {
     private var last7DaysData: [DailySleep] {
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: Date())
-
         return (0..<7).reversed().map { offset in
             let day = calendar.date(byAdding: .day, value: -offset, to: today)!
-
             let dayRecords = records.filter { calendar.isDate($0.date, inSameDayAs: day) }
-            let total = totalMinutes(for: dayRecords)
-
-            return DailySleep(date: day, totalMinutes: total)
+            return DailySleep(date: day, totalMinutes: totalMinutes(for: dayRecords))
         }
     }
 
-    // MARK: - UI pieces
-    private var statsHeader: some View {
-        HStack(spacing: 12) {
-            MetricCard("Today", TimeFormat.minutes(todayTotal), emphasized: true)
-            MetricCard("7-day avg", TimeFormat.minutes(last7DaysAverage), emphasized: false)
-        }
-        .padding(.horizontal, 16)
-        .padding(.top, 8)
-        .padding(.bottom, 4)
-        .listRowInsets(EdgeInsets())
-        .listRowBackground(Color.clear)
-    }
-
-    private var sleepChartCard: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Last 7 Days")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-
-            Chart(last7DaysData) { item in
-                let isToday = Calendar.current.isDateInToday(item.date)
-
-                BarMark(
-                    x: .value("Day", item.date, unit: .day),
-                    y: .value("Minutes", animateChart ? item.totalMinutes : 0)
-                )
-                .cornerRadius(8)
-                .opacity(isToday ? 1.0 : 0.28)
-                .foregroundStyle(
-                    isToday
-                    ? AnyShapeStyle(
-                        LinearGradient(
-                            colors: [.indigo, .indigo.opacity(0.75)],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    )
-                    : AnyShapeStyle(Color.indigo.opacity(0.25))
-                )
-                .annotation(position: .top) {
-                    if isToday, let label = hoursLabel(from: item.totalMinutes) {
-                        Text(label)
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-            }
-            .chartPlotStyle { plotArea in
-                plotArea.padding(.horizontal, 6)
-            }
-            .onAppear {
-                animateChart = false
-                withAnimation(.easeOut(duration: 0.7)) { animateChart = true }
-            }
-            .onChange(of: records.count) { _ in
-                animateChart = false
-                withAnimation(.easeInOut(duration: 0.6)) { animateChart = true }
-            }
-            .frame(height: 120)
-            .chartYAxis(.hidden)
-            .chartXAxis {
-                AxisMarks(values: .stride(by: .day)) { _ in
-                    AxisValueLabel(format: .dateTime.weekday(.abbreviated))
-                }
-            }
-        }
-        .padding()
-        .background(Color(.secondarySystemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 14))
-    }
-
-    struct MetricCard: View {
-        let title: String
-        let value: String
-        let emphasized: Bool
-
-        init(_ title: String, _ value: String, emphasized: Bool = true) {
-            self.title = title
-            self.value = value
-            self.emphasized = emphasized
-        }
-
-        var body: some View {
-            VStack(alignment: .leading, spacing: 6) {
-                Text(title)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-
-                Text(value)
-                    .font(emphasized ? .title3.weight(.semibold) : .headline.weight(.semibold))
-                    .foregroundStyle(.primary)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(14)
-            .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-        }
-    }
-
-    private func hoursLabel(from minutes: Int) -> String? {
-        guard minutes > 0 else { return nil }
-        return TimeFormat.minutes(minutes)
+    private func totalMinutes(for items: [SleepRecord]) -> Int {
+        let naps = items.filter { $0.kind != .break }
+        let breaks = items.filter { $0.kind == .break }
+        return naps.reduce(0) { $0 + $1.totalMinutes(breaks: breaks) }
     }
 
     private func dayTitle(_ day: Date) -> String {
@@ -232,88 +110,8 @@ struct SleepListView: View {
         return day.formatted(.dateTime.day().month(.abbreviated))
     }
 
-    private func totalMinutes(for items: [SleepRecord]) -> Int {
-        let naps = items.filter { $0.kind != .break }
-        let breaks = items.filter { $0.kind == .break }
-        return naps.reduce(0) { $0 + $1.totalMinutes(breaks: breaks) }
-    }
-
     private func isToday(_ day: Date) -> Bool {
         Calendar.current.isDateInToday(day)
-    }
-
-    struct DayRowCard: View {
-        let title: String
-        let sessionCount: Int
-        let totalText: String
-        let highlightToday: Bool
-
-        var body: some View {
-            HStack(spacing: 12) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .fill(Color.indigo.opacity(0.12))
-
-                    Image(systemName: "calendar")
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundStyle(.indigo)
-                }
-                .frame(width: 44, height: 44)
-
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack(spacing: 8) {
-                        Text(title).font(.headline)
-
-                        if highlightToday && title != "Today" {
-                            Text("Today")
-                                .font(.caption2.weight(.semibold))
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 4)
-                                .background(.thinMaterial, in: Capsule())
-                                .overlay(Capsule().stroke(Color.indigo.opacity(0.25), lineWidth: 1))
-                                .foregroundStyle(.indigo)
-                        }
-                    }
-
-                    Text("\(sessionCount) sessions")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-
-                Spacer()
-
-                HStack(spacing: 10) {
-                    Text(totalText)
-                        .font(.headline.weight(.semibold))
-                        .foregroundStyle(.primary)
-
-                    Image(systemName: "chevron.right")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.tertiary)
-                }
-            }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 12)
-            .background(
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .fill(Color(.secondarySystemBackground))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .stroke(Color.primary.opacity(0.04), lineWidth: 1)
-            )
-            .shadow(color: Color.black.opacity(0.04), radius: 10, x: 0, y: 6)
-            .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-        }
-    }
-
-    struct CardPressButtonStyle: ButtonStyle {
-        func makeBody(configuration: Configuration) -> some View {
-            configuration.label
-                .scaleEffect(configuration.isPressed ? 0.98 : 1)
-                .opacity(configuration.isPressed ? 0.92 : 1)
-                .animation(.easeOut(duration: 0.15), value: configuration.isPressed)
-        }
     }
 
     private func deleteDay(_ day: Date) {
@@ -322,92 +120,41 @@ struct SleepListView: View {
         saveRecords()
     }
 
+    // MARK: - Chart max Y
+
+    private var chartMaxMinutes: Int {
+        let maxVal = last7DaysData.map { $0.totalMinutes }.max() ?? 0
+        let hours = max(1, Int(ceil(Double(maxVal) / 60.0)))
+        return hours * 60
+    }
+
     // MARK: - Body
+
     var body: some View {
         NavigationStack {
-            List {
-                Section {
-                    if !records.isEmpty {
-                        sleepChartCard
-                            .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
-                            .listRowBackground(Color.clear)
-                            .listRowSeparator(.hidden)
+            ScrollView {
+                VStack(spacing: 20) {
+                    // ── Metric Cards ──
+                    metricCards
+
+                    // ── Chart Card ──
+                    chartCard
+
+                    // ── Day List Card ──
+                    if !groupedByDay.isEmpty {
+                        dayListCard
                     }
 
-                    ForEach(groupedByDay, id: \.day) { group in
-                        Button {
-                            activeSheet = .dayDetail(SelectedDay(day: group.day))
-                        } label: {
-                            DayRowCard(
-                                title: dayTitle(group.day),
-                                sessionCount: group.items.filter { $0.kind != .break }.count,
-                                totalText: TimeFormat.minutes(totalMinutes(for: group.items)),
-                                highlightToday: isToday(group.day)
-                            )
-                        }
-                        .buttonStyle(CardPressButtonStyle())
-                        .listRowInsets(EdgeInsets(top: 5, leading: 16, bottom: 5, trailing: 16))
-                        .listRowBackground(Color.clear)
-                        .listRowSeparator(.hidden)
-                        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                            Button(role: .destructive) {
-                                deleteDay(group.day)
-                            } label: {
-                                Label("Delete", systemImage: "trash")
-                            }
-                        }
-                        .swipeActions(edge: .leading, allowsFullSwipe: false) {
-                            Button {
-                                addDefaultDate = group.day
-                                activeSheet = .addSleep
-                            } label: {
-                                Label("Add", systemImage: "plus")
-                            }
-                            .tint(.indigo)
-                        }
-                    }
-                } header: {
-                    statsHeader
-                        .textCase(nil)
-                        .padding(.top, 8)
+                    // ── Tip Banner ──
+                    tipBanner
                 }
+                .padding(.horizontal, 16)
+                .padding(.top, 8)
+                .padding(.bottom, 32)
             }
-            .listStyle(.insetGrouped)
-            .scrollContentBackground(.hidden)
             .background(Color(.systemGroupedBackground))
-            .overlay {
-                if sortedRecords.isEmpty {
-                    VStack(spacing: 16) {
-                        Image(systemName: "moon.zzz.fill")
-                            .font(.system(size: 48))
-                            .foregroundStyle(.indigo)
-
-                        Text("No sleep records yet")
-                            .font(.headline)
-
-                        Text("Tap the + button to add your first sleep session")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                            .multilineTextAlignment(.center)
-
-                        Button {
-                            addDefaultDate = Date()
-                            activeSheet = .addSleep
-                        } label: {
-                            Label("Add Sleep", systemImage: "plus")
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 10)
-                                .background(Color.indigo, in: Capsule())
-                                .foregroundStyle(.white)
-                        }
-                        .padding(.top, 4)
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .padding(.horizontal, 32)
-                }
-            }
-            .navigationTitle("Naps")
-            .navigationBarTitleDisplayMode(.inline)
+            .navigationTitle("Umay's Nap")
+            .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Menu {
@@ -417,24 +164,28 @@ struct SleepListView: View {
                         } label: {
                             Label("Add Nap", systemImage: "plus.circle")
                         }
-
-                        Button {
-                            breakTargetDay = Date()
-                            activeSheet = .pickNapForBreak
-                        } label: {
-                            Label("Add Break", systemImage: "cup.and.saucer.fill")
-                        }
                     } label: {
-                        Image(systemName: "plus")
+                        ZStack {
+                            Circle()
+                                .fill(Color.indigo.opacity(0.12))
+                                .frame(width: 36, height: 36)
+                            Image(systemName: "plus")
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundStyle(.indigo)
+                        }
                     }
                 }
             }
             .onAppear { loadRecords() }
             .environment(\.locale, Locale(identifier: "en_US"))
+            .overlay {
+                if sortedRecords.isEmpty {
+                    emptyState
+                }
+            }
         }
         .sheet(item: $activeSheet) { sheet in
             switch sheet {
-
             case .addSleep:
                 AddRecordView(
                     defaultDate: addDefaultDate,
@@ -444,22 +195,6 @@ struct SleepListView: View {
                         saveRecords()
                     }
                 )
-
-            case .pickNapForBreak:
-                let naps = records
-                    .filter { Calendar.current.isDate($0.date, inSameDayAs: breakTargetDay) }
-                    .filter { $0.kind == .dayNap || $0.kind == .nightSleep }
-                    .sorted { $0.date < $1.date }
-
-                NapPickerView(naps: naps) { selectedNap in
-                    selectedNapIDForBreak = selectedNap.id
-                    breakDefaultDate = breakTargetDay
-                    self.activeSheet = nil
-                    
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                                self.activeSheet = .addBreak
-                            }                }
-
             case .addBreak:
                 AddBreakView(
                     defaultDate: breakDefaultDate,
@@ -469,12 +204,10 @@ struct SleepListView: View {
                         saveRecords()
                     }
                 )
-
             case .dayDetail(let selected):
                 let dayRecords = records
                     .filter { Calendar.current.isDate($0.date, inSameDayAs: selected.day) }
                     .sorted { $0.date < $1.date }
-
                 DayDetailView(
                     day: selected.day,
                     records: dayRecords,
@@ -482,26 +215,320 @@ struct SleepListView: View {
                         records.removeAll { idsToDelete.contains($0.id) }
                         saveRecords()
                     },
-                    onAddTap: { mode, day, targetNapID in
-                        switch mode {
-                        case .sleep:
-                            addDefaultDate = day
-                            activeSheet = .addSleep
-
-                        case .break:
-                            breakTargetDay = day
-
-                            if let id = targetNapID {
-                                selectedNapIDForBreak = id
-                                breakDefaultDate = day
-                                activeSheet = .addBreak
-                            } else {
-                                activeSheet = .pickNapForBreak
-                            }
-                        }
+                    onAddSleep: { day in
+                        addDefaultDate = day
+                        activeSheet = .addSleep
+                    },
+                    onBreakSaved: { newBreak in
+                        records.append(newBreak)
+                        saveRecords()
                     }
                 )
             }
         }
+    }
+
+    // MARK: - Metric Cards
+
+    private var metricCards: some View {
+        HStack(spacing: 12) {
+            // Today
+            VStack(alignment: .leading, spacing: 10) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(Color.orange.opacity(0.15))
+                        .frame(width: 36, height: 36)
+                    Image(systemName: "sun.max.fill")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(.orange)
+                }
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Today")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    Text(TimeFormat.minutes(todayTotal))
+                        .font(.title2.weight(.bold))
+                        .foregroundStyle(.primary)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(14)
+            .background(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(Color(.systemBackground))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .stroke(Color.primary.opacity(0.05), lineWidth: 1)
+            )
+
+            // 7-day avg
+            VStack(alignment: .leading, spacing: 10) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(Color.indigo.opacity(0.12))
+                        .frame(width: 36, height: 36)
+                    Image(systemName: "chart.xyaxis.line")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(.indigo)
+                }
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("7-day avg")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    Text(TimeFormat.minutes(last7DaysAverage))
+                        .font(.title2.weight(.bold))
+                        .foregroundStyle(.primary)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(14)
+            .background(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(Color(.systemBackground))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .stroke(Color.primary.opacity(0.05), lineWidth: 1)
+            )
+        }
+    }
+
+    // MARK: - Chart Card
+
+    private var chartCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // Header
+            HStack {
+                Text("Last 7 Days")
+                    .font(.headline)
+                    .foregroundStyle(.primary)
+                Spacer()
+                // "Total time" static badge
+                HStack(spacing: 4) {
+                    Text("Total time")
+                        .font(.subheadline)
+                        .foregroundStyle(.primary)
+                    Image(systemName: "chevron.down")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(Color(.secondarySystemGroupedBackground))
+                )
+            }
+
+            Chart(last7DaysData) { item in
+                let isToday = Calendar.current.isDateInToday(item.date)
+
+                BarMark(
+                    x: .value("Day", item.date, unit: .day),
+                    y: .value("Minutes", animateChart ? item.totalMinutes : 0)
+                )
+                .cornerRadius(6)
+                .foregroundStyle(
+                    isToday
+                    ? AnyShapeStyle(
+                        LinearGradient(
+                            colors: [Color.indigo, Color.indigo.opacity(0.7)],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+                    : AnyShapeStyle(Color.indigo.opacity(0.18))
+                )
+                .annotation(position: .top) {
+                    if isToday && item.totalMinutes > 0 {
+                        Text(TimeFormat.minutes(item.totalMinutes))
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(.indigo)
+                    }
+                }
+            }
+            .chartYScale(domain: 0...chartMaxMinutes)
+            .chartYAxis {
+                AxisMarks(values: stride(from: 0, through: chartMaxMinutes, by: 60 * 5).map { $0 }) { value in
+                    AxisGridLine(stroke: StrokeStyle(lineWidth: 1, dash: [4, 4]))
+                        .foregroundStyle(Color.primary.opacity(0.08))
+                    AxisValueLabel {
+                        if let minutes = value.as(Int.self) {
+                            Text("\(minutes / 60)h")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            }
+            .chartXAxis {
+                AxisMarks(values: .stride(by: .day)) { _ in
+                    AxisValueLabel(format: .dateTime.weekday(.abbreviated))
+                        .font(.caption2)
+                }
+            }
+            .chartPlotStyle { plotArea in
+                plotArea.padding(.horizontal, 4)
+            }
+            .frame(height: 180)
+            .onAppear {
+                animateChart = false
+                withAnimation(.easeOut(duration: 0.7)) { animateChart = true }
+            }
+            .onChange(of: records.count) { _ in
+                animateChart = false
+                withAnimation(.easeInOut(duration: 0.6)) { animateChart = true }
+            }
+        }
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(Color(.systemBackground))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(Color.primary.opacity(0.05), lineWidth: 1)
+        )
+    }
+
+    // MARK: - Day List Card (tek kart, separator ile)
+
+    private var dayListCard: some View {
+        VStack(spacing: 0) {
+            ForEach(Array(groupedByDay.enumerated()), id: \.element.day) { index, group in
+                Button {
+                    activeSheet = .dayDetail(SelectedDay(day: group.day))
+                } label: {
+                    dayRow(group: group)
+                }
+                .buttonStyle(CardPressButtonStyle())
+
+                if index < groupedByDay.count - 1 {
+                    Divider()
+                        .padding(.leading, 72)
+                }
+            }
+        }
+        .background(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(Color(.systemBackground))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(Color.primary.opacity(0.05), lineWidth: 1)
+        )
+        .clipped()
+    }
+
+    private func dayRow(group: (day: Date, items: [SleepRecord])) -> some View {
+        HStack(spacing: 14) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(Color.indigo.opacity(0.12))
+                    .frame(width: 44, height: 44)
+                Image(systemName: "calendar")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(.indigo)
+            }
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(dayTitle(group.day))
+                    .font(.headline)
+                    .foregroundStyle(.primary)
+                Text("\(group.items.filter { $0.kind != .break }.count) sessions")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+
+            HStack(spacing: 6) {
+                Text(TimeFormat.minutes(totalMinutes(for: group.items)))
+                    .font(.headline.weight(.semibold))
+                    .foregroundStyle(.primary)
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.tertiary)
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
+        .contentShape(Rectangle())
+        .contextMenu {
+            Button(role: .destructive) {
+                deleteDay(group.day)
+            } label: {
+                Label("Delete", systemImage: "trash")
+            }
+        }
+    }
+
+    // MARK: - Tip Banner
+
+    private var tipBanner: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: "info.circle.fill")
+                .font(.system(size: 16))
+                .foregroundStyle(.indigo)
+                .padding(.top, 1)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text("Tip")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.indigo)
+                Text("Short naps (10–90 min) can boost alertness, mood, and performance.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+        }
+        .padding(14)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(Color.indigo.opacity(0.06))
+        )
+    }
+
+    // MARK: - Empty State
+
+    private var emptyState: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "moon.zzz.fill")
+                .font(.system(size: 48))
+                .foregroundStyle(.indigo)
+            Text("No sleep records yet")
+                .font(.headline)
+            Text("Tap the + button to add your first sleep session")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+            Button {
+                addDefaultDate = Date()
+                activeSheet = .addSleep
+            } label: {
+                Label("Add Sleep", systemImage: "plus")
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .background(Color.indigo, in: Capsule())
+                    .foregroundStyle(.white)
+            }
+            .padding(.top, 4)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(.horizontal, 32)
+        .background(Color(.systemGroupedBackground))
+    }
+}
+
+// MARK: - CardPressButtonStyle
+
+struct CardPressButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.98 : 1)
+            .opacity(configuration.isPressed ? 0.92 : 1)
+            .animation(.easeOut(duration: 0.15), value: configuration.isPressed)
     }
 }
