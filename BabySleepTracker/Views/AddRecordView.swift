@@ -14,6 +14,11 @@ struct AddRecordView: View {
     @State private var endManuallyEdited = false
     @State private var isProgrammaticChange = false
 
+    // Expanded picker state
+    @State private var expandedField: ExpandedField? = nil
+
+    enum ExpandedField { case date, start, end }
+
     init(defaultDate: Date, vm: AddRecordViewModel, onSave: @escaping (SleepRecord) -> Void) {
         self.defaultDate = defaultDate
         self.onSave = onSave
@@ -27,18 +32,24 @@ struct AddRecordView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 16) {
-                    // ── Segmented kind selector (tam genişlik) ──
+
+                    // ── Kind Selector ──────────────────────
                     kindSelector
                         .padding(.horizontal, 16)
                         .padding(.top, 8)
 
-                    // ── Date / Time form grubu ──
-                    formCard
+                    // ── Info Banner ────────────────────────
+                    infoBanner
+                        .padding(.horizontal, 16)
 
-                    // ── Summary ──
-                    summaryCard
+                    // ── WHEN section ───────────────────────
+                    whenSection
+
+                    // ── Sleep Summary ──────────────────────
+                    sleepSummaryCard
+
                 }
-                .padding(.bottom, 24)
+                .padding(.bottom, 32)
             }
             .background(Color(.systemGroupedBackground))
             .navigationTitle("Add Sleep Session")
@@ -48,9 +59,19 @@ struct AddRecordView: View {
                     Button("Cancel") { dismiss() }
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Save") { save() }
-                        .fontWeight(.semibold)
-                        .disabled(durationMinutes <= 0)
+                    Button {
+                        save()
+                    } label: {
+                        Text("Save")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 8)
+                            .background(
+                                Capsule().fill(durationMinutes > 0 ? Color.indigo : Color.secondary)
+                            )
+                    }
+                    .disabled(durationMinutes <= 0)
                 }
             }
             .onAppear {
@@ -78,7 +99,7 @@ struct AddRecordView: View {
         .tint(.indigo)
     }
 
-    // MARK: - Kind Selector (Segmented, tam genişlik)
+    // MARK: - Kind Selector
 
     private var kindSelector: some View {
         HStack(spacing: 0) {
@@ -88,7 +109,7 @@ struct AddRecordView: View {
         .frame(maxWidth: .infinity)
         .background(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(Color(.secondarySystemGroupedBackground))
+                .fill(Color(.systemBackground))
         )
         .overlay(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
@@ -119,94 +140,215 @@ struct AddRecordView: View {
         .buttonStyle(.plain)
     }
 
-    // MARK: - Form Card (Date / Start / End)
+    // MARK: - Info Banner
 
-    private var formCard: some View {
-        VStack(spacing: 0) {
-            // Date
-            formRow {
-                Label("Date", systemImage: "calendar")
+    private var infoBanner: some View {
+        HStack(alignment: .center, spacing: 12) {
+            Text("😴")
+                .font(.system(size: 40))
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text("Track your baby's sleep")
+                    .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.primary)
-                Spacer()
-                DatePicker("", selection: $selectedDate, displayedComponents: [.date])
-                    .labelsHidden()
-                    .datePickerStyle(.compact)
-                    .environment(\.locale, Locale(identifier: "en_US"))
-            }
-
-            if vm.kind == .nightSleep {
-                Text("The selected date is the sleep start date.")
-                    .font(.footnote)
+                Text("We'll automatically subtract any breaks (wake periods) from the total sleep time.")
+                    .font(.caption)
                     .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 10)
-            }
-
-            formDivider
-
-            // Start Time
-            formRow {
-                Label("Start Time", systemImage: "clock")
-                    .foregroundStyle(.primary)
-                Spacer()
-                DatePicker("", selection: $startTime, displayedComponents: [.hourAndMinute])
-                    .labelsHidden()
-                    .datePickerStyle(.compact)
-                    .environment(\.locale, Locale(identifier: "en_US"))
-            }
-
-            formDivider
-
-            // End Time
-            formRow {
-                Label("End Time", systemImage: "clock.badge.checkmark")
-                    .foregroundStyle(.primary)
-                Spacer()
-                DatePicker("", selection: $endTime, displayedComponents: [.hourAndMinute])
-                    .labelsHidden()
-                    .datePickerStyle(.compact)
-                    .environment(\.locale, Locale(identifier: "en_US"))
             }
         }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .background(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(Color(.secondarySystemGroupedBackground))
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(Color.indigo.opacity(0.06))
         )
-        .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .stroke(Color.primary.opacity(0.06), lineWidth: 1)
-        )
-        .padding(.horizontal, 16)
     }
 
-    // MARK: - Summary Card
+    // MARK: - WHEN Section
 
-    private var summaryCard: some View {
-        VStack(spacing: 0) {
-            formRow {
-                Text("Total Duration")
-                    .foregroundStyle(.primary)
-                Spacer()
+    private var whenSection: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("WHEN")
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 16)
+                .padding(.bottom, 6)
 
-                if crossesMidnight {
-                    Text("+1 day")
-                        .font(.caption.weight(.semibold))
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(Capsule().fill(Color.indigo.opacity(0.12)))
-                        .foregroundStyle(.indigo)
-                        .padding(.trailing, 4)
+            VStack(spacing: 0) {
+                // Date row
+                fieldRow(
+                    icon: "calendar.badge.clock",
+                    label: "Date",
+                    value: selectedDate.formatted(.dateTime.month(.abbreviated).day().year()),
+                    isExpanded: expandedField == .date,
+                    onTap: { toggle(.date) }
+                )
+                if expandedField == .date {
+                    DatePicker("", selection: $selectedDate, displayedComponents: [.date])
+                        .labelsHidden()
+                        .datePickerStyle(.wheel)
+                        .environment(\.locale, Locale(identifier: "en_US"))
+                        .frame(maxWidth: .infinity)
+                        .transition(.opacity.combined(with: .move(edge: .top)))
                 }
 
-                Text(TimeFormat.minutes(durationMinutes))
-                    .font(.headline.weight(.semibold))
-                    .foregroundStyle(durationMinutes > 0 ? .primary : .secondary)
+                Divider().padding(.leading, 52)
+
+                // Start Time row
+                fieldRow(
+                    icon: "clock",
+                    label: "Start Time",
+                    value: TimeFormat.ampm(startTime),
+                    isExpanded: expandedField == .start,
+                    onTap: { toggle(.start) }
+                )
+                if expandedField == .start {
+                    DatePicker("", selection: $startTime, displayedComponents: [.hourAndMinute])
+                        .labelsHidden()
+                        .datePickerStyle(.wheel)
+                        .environment(\.locale, Locale(identifier: "en_US"))
+                        .frame(maxWidth: .infinity)
+                        .transition(.opacity.combined(with: .move(edge: .top)))
+                }
+
+                Divider().padding(.leading, 52)
+
+                // End Time row
+                fieldRow(
+                    icon: "clock.badge.checkmark",
+                    label: "End Time",
+                    value: TimeFormat.ampm(endTime),
+                    isExpanded: expandedField == .end,
+                    onTap: { toggle(.end) }
+                )
+                if expandedField == .end {
+                    DatePicker("", selection: $endTime, displayedComponents: [.hourAndMinute])
+                        .labelsHidden()
+                        .datePickerStyle(.wheel)
+                        .environment(\.locale, Locale(identifier: "en_US"))
+                        .frame(maxWidth: .infinity)
+                        .transition(.opacity.combined(with: .move(edge: .top)))
+                }
+
+                if vm.kind == .nightSleep {
+                    Divider().padding(.leading, 52)
+                    HStack(spacing: 8) {
+                        Color.clear.frame(width: 36)
+                        Text("The selected date is the sleep start date.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                }
             }
+            .background(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(Color(.systemBackground))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .stroke(Color.primary.opacity(0.06), lineWidth: 1)
+            )
+            .padding(.horizontal, 16)
+            .animation(.easeInOut(duration: 0.2), value: expandedField)
         }
+    }
+
+    private func fieldRow(icon: String, label: String, value: String,
+                          isExpanded: Bool, onTap: @escaping () -> Void) -> some View {
+        Button(action: onTap) {
+            HStack(spacing: 12) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color.indigo.opacity(0.10))
+                        .frame(width: 32, height: 32)
+                    Image(systemName: icon)
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(.indigo)
+                }
+
+                Text(label)
+                    .font(.body)
+                    .foregroundStyle(.primary)
+
+                Spacer()
+
+                Text(value)
+                    .font(.body)
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
+
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.tertiary)
+                    .rotationEffect(.degrees(isExpanded ? 90 : 0))
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func toggle(_ field: ExpandedField) {
+        withAnimation(.easeInOut(duration: 0.2)) {
+            expandedField = expandedField == field ? nil : field
+        }
+    }
+
+    // MARK: - Sleep Summary Card
+
+    private var sleepSummaryCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("Sleep Summary")
+                    .font(.headline.weight(.semibold))
+                Spacer()
+                Image(systemName: "info.circle")
+                    .font(.system(size: 16))
+                    .foregroundStyle(.indigo.opacity(0.6))
+            }
+
+            // Stats row
+            HStack(spacing: 0) {
+                summaryStatCell(label: "In Bed", value: TimeFormat.minutes(durationMinutes), color: .primary)
+                Divider().frame(height: 44)
+                summaryStatCell(label: "Breaks", value: "0m", color: .secondary)
+                Divider().frame(height: 44)
+                summaryStatCell(label: "Net Sleep", value: TimeFormat.minutes(durationMinutes), color: .indigo)
+            }
+            .padding(.vertical, 6)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color(.secondarySystemGroupedBackground))
+            )
+
+            if crossesMidnight {
+                HStack(spacing: 6) {
+                    Image(systemName: "moon.stars")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.indigo.opacity(0.7))
+                    Text("Sleep crosses midnight (+1 day)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            // Tip
+            HStack(alignment: .top, spacing: 8) {
+                Text("💡")
+                    .font(.system(size: 14))
+                Text("Breaks are periods when your baby was awake between sleep.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.top, 4)
+        }
+        .padding(16)
         .background(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(Color(.secondarySystemGroupedBackground))
+                .fill(Color(.systemBackground))
         )
         .overlay(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
@@ -215,22 +357,20 @@ struct AddRecordView: View {
         .padding(.horizontal, 16)
     }
 
-    // MARK: - Helpers
-
-    private var formDivider: some View {
-        Divider().padding(.leading, 16)
-    }
-
-    private func formRow(@ViewBuilder _ content: () -> some View) -> some View {
-        HStack {
-            content()
+    private func summaryStatCell(label: String, value: String, color: Color) -> some View {
+        VStack(spacing: 4) {
+            Text(label)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Text(value)
+                .font(.title3.weight(.bold))
+                .foregroundStyle(color)
+                .monospacedDigit()
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 14)
-        .font(.body)
+        .frame(maxWidth: .infinity)
     }
 
-    // MARK: - Logic (unchanged)
+    // MARK: - Logic
 
     private var defaultEndMinutes: Int {
         switch vm.kind {
@@ -253,18 +393,12 @@ struct AddRecordView: View {
     }
 
     private func validateTimesAfterStartChange() {
-        if vm.kind == .dayNap, endDateTime <= startDateTime {
-            applyDefaultEndFromStart()
-        }
-        if vm.kind == .nightSleep, durationMinutes <= 0, !endManuallyEdited {
-            applyDefaultEndFromStart()
-        }
+        if vm.kind == .dayNap, endDateTime <= startDateTime { applyDefaultEndFromStart() }
+        if vm.kind == .nightSleep, durationMinutes <= 0, !endManuallyEdited { applyDefaultEndFromStart() }
     }
 
     private func validateTimesAfterEndChange() {
-        if vm.kind == .dayNap, endDateTime <= startDateTime {
-            applyDefaultEndFromStart()
-        }
+        if vm.kind == .dayNap, endDateTime <= startDateTime { applyDefaultEndFromStart() }
     }
 
     private func save() {
