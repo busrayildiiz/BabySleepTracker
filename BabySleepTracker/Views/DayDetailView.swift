@@ -14,11 +14,10 @@ struct DayDetailView: View {
     let onBreakSaved: (_ newBreak: SleepRecord) -> Void
 
     @State private var showAddMenu = false
-    @State private var selectedNapID: UUID? = nil
+    @State private var showAddBreak = false
+    @State private var breakTargetNap: SleepRecord? = nil
     @State private var contextNap: SleepRecord? = nil
     @State private var showNapActions = false
-    @State private var showAddBreak = false
-    @State private var breakTargetNapID: UUID? = nil
 
     @Environment(\.dismiss) private var dismiss
 
@@ -35,23 +34,22 @@ struct DayDetailView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 12) {
+                VStack(spacing: 14) {
                     ForEach(Array(sortedNaps.enumerated()), id: \.element.id) { index, nap in
-                        let napBreaks = breaks
-                            .filter { $0.parentNapID == nap.id }
-                            .sorted { $0.date < $1.date }
-
+                        let napBreaks = breaks.filter { $0.parentNapID == nap.id }.sorted { $0.date < $1.date }
                         let napNumber = nap.kind == .dayNap
                             ? sortedNaps.prefix(index + 1).filter { $0.kind == .dayNap }.count
                             : 0
 
-                        NapTimelineSection(
+                        NapDetailCard(
                             napNumber: napNumber,
                             nap: nap,
-                            breaks: napBreaks,
+                            napBreaks: napBreaks,
                             allBreaks: breaks,
-                            isSelected: selectedNapID == nap.id,
-                            onNapTap: { selectedNapID = nap.id },
+                            onAddBreakTap: {
+                                breakTargetNap = nap
+                                showAddBreak = true
+                            },
                             onLongPress: {
                                 contextNap = nap
                                 showNapActions = true
@@ -61,7 +59,7 @@ struct DayDetailView: View {
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 12)
-                .padding(.bottom, 24)
+                .padding(.bottom, 32)
             }
             .background(Color(.systemGroupedBackground))
             .navigationTitle(dayTitle)
@@ -85,26 +83,27 @@ struct DayDetailView: View {
                 isPresented: $showNapActions,
                 titleVisibility: .visible
             ) {
-                Button("Add Break") {
-                    breakTargetNapID = contextNap?.id
+                Button("Add Wake Period") {
+                    breakTargetNap = contextNap
                     showAddBreak = true
                 }
                 Button("Delete", role: .destructive) {
-                    if let nap = contextNap {
-                        onDelete([nap.id])
-                    }
+                    if let nap = contextNap { onDelete([nap.id]) }
                 }
                 Button("Cancel", role: .cancel) { contextNap = nil }
             }
-            // AddBreakView DayDetailView içinden açılıyor
             .sheet(isPresented: $showAddBreak) {
-                AddBreakView(
-                    defaultDate: day,
-                    targetNapID: breakTargetNapID,
-                    onSave: { newBreak in
-                        onBreakSaved(newBreak)
-                    }
-                )
+                if let nap = breakTargetNap {
+                    AddBreakView(
+                        defaultDate: nap.date,
+                        targetNapID: nap.id,
+                        napDuration: nap.duration,
+                        existingBreaks: breaks.filter { $0.parentNapID == nap.id },
+                        onSave: { newBreak in
+                            onBreakSaved(newBreak)
+                        }
+                    )
+                }
             }
         }
         .tint(.indigo)
@@ -118,249 +117,185 @@ struct DayDetailView: View {
     }
 }
 
-// MARK: - NapTimelineSection
+// MARK: - NapDetailCard
 
-struct NapTimelineSection: View {
+struct NapDetailCard: View {
     let napNumber: Int
     let nap: SleepRecord
-    let breaks: [SleepRecord]
+    let napBreaks: [SleepRecord]
     let allBreaks: [SleepRecord]
-    let isSelected: Bool
-    let onNapTap: () -> Void
+    let onAddBreakTap: () -> Void
     let onLongPress: () -> Void
 
+    @State private var breaksExpanded = true
+
     private var isNight: Bool { nap.kind == .nightSleep }
-    private var napTint: Color { isNight ? Color.indigo : Color.orange }
+    private var napTint: Color { isNight ? .indigo : .orange }
     private var netMinutes: Int { nap.totalMinutes(breaks: allBreaks) }
-    private var napEnd: Date {
-        nap.date.addingTimeInterval(TimeInterval(nap.duration * 60))
-    }
-    private var title: String {
-        isNight ? "Night Sleep" : "\(napNumber). Nap"
-    }
+    private var napEnd: Date { nap.date.addingTimeInterval(TimeInterval(nap.duration * 60)) }
+    private var title: String { isNight ? "Night Sleep" : "Day Nap" }
 
     var body: some View {
         VStack(spacing: 0) {
-            VStack(spacing: 0) {
 
-                // Nap header — seçim highlight sadece bu row'da
-                HStack(spacing: 14) {
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .fill(napTint.opacity(0.18))
-                            .frame(width: 52, height: 52)
-                        Image(systemName: nap.kind.icon)
-                            .font(.system(size: 22, weight: .semibold))
-                            .foregroundStyle(napTint)
+            // ── Header row ─────────────────────────────────
+            HStack(spacing: 10) {
+                Image(systemName: nap.kind.icon)
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(napTint)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(.subheadline.weight(.bold))
+                        .foregroundStyle(napTint)
+                    Text("\(TimeFormat.ampm(nap.date)) – \(TimeFormat.ampm(napEnd))")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
+                }
+
+                Spacer()
+
+                VStack(alignment: .trailing, spacing: 2) {
+                    Text(TimeFormat.minutes(nap.duration))
+                        .font(.subheadline.weight(.bold))
+                        .foregroundStyle(.primary)
+                    Text("Total Sleep Time")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .padding(.horizontal, 14)
+            .padding(.top, 14)
+            .padding(.bottom, 10)
+            .contentShape(Rectangle())
+            .onLongPressGesture(minimumDuration: 0.4) {
+                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                onLongPress()
+            }
+
+            Divider().padding(.horizontal, 14)
+
+            // ── Stats row ──────────────────────────────────
+            HStack(spacing: 0) {
+                // Breaks count
+                VStack(spacing: 4) {
+                    Text("\(napBreaks.count)")
+                        .font(.title2.weight(.bold))
+                        .foregroundStyle(.primary)
+                    HStack(spacing: 4) {
+                        Text("Breaks")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Image(systemName: "info.circle")
+                            .font(.system(size: 10))
+                            .foregroundStyle(.secondary)
                     }
+                }
+                .frame(maxWidth: .infinity)
 
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(title)
-                            .font(.headline)
-                            .foregroundStyle(.primary)
+                Divider().frame(height: 36)
 
-                        if !breaks.isEmpty {
-                            Text("\(TimeFormat.minutes(netMinutes)) net sleep")
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                        } else {
-                            Text("\(TimeFormat.ampm(nap.date)) — \(TimeFormat.ampm(napEnd))")
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                                .monospacedDigit()
+                // Net sleep
+                VStack(spacing: 4) {
+                    Text(TimeFormat.minutes(netMinutes))
+                        .font(.title2.weight(.bold))
+                        .foregroundStyle(.indigo)
+                    Text("Net Sleep")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity)
+            }
+            .padding(.vertical, 14)
+            .padding(.horizontal, 14)
+
+            // ── Breaks list (expandable) ───────────────────
+            if !napBreaks.isEmpty {
+                Divider().padding(.horizontal, 14)
+
+                VStack(spacing: 0) {
+                    // Breaks header
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            breaksExpanded.toggle()
                         }
-                    }
-
-                    Spacer()
-
-                    HStack(spacing: 6) {
-                        Text(TimeFormat.minutes(nap.duration))
-                            .font(.headline.weight(.semibold))
-                            .foregroundStyle(.primary)
-                        Image(systemName: "chevron.right")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(.tertiary)
-                    }
-                }
-                .padding(14)
-                .background(
-                    isSelected
-                        ? AnyView(
-                            napTint.opacity(0.08)
-                                .clipShape(
-                                    RoundedCorners(
-                                        tl: 18, tr: 18,
-                                        bl: breaks.isEmpty ? 18 : 0,
-                                        br: breaks.isEmpty ? 18 : 0
-                                    )
-                                )
-                          )
-                        : AnyView(Color.clear)
-                )
-                .contentShape(Rectangle())
-                .onTapGesture { onNapTap() }
-                .onLongPressGesture(minimumDuration: 0.4) {
-                    let impact = UIImpactFeedbackGenerator(style: .medium)
-                    impact.impactOccurred()
-                    onLongPress()
-                }
-
-                // Break'ler
-                if !breaks.isEmpty {
-                    ForEach(Array(breaks.enumerated()), id: \.element.id) { i, br in
-                        // Connector — ikon merkezi: padding(14) + iconWidth(52)/2 = 40pt
-                        HStack(spacing: 0) {
-                            // Sol boşluk: 14(padding) + 52/2 - 1(çizgi yarısı) = 39
-                            Color.clear.frame(width: 39)
-
-                            VStack(spacing: 0) {
-                                Circle()
-                                    .fill(i == 0 ? napTint : Color.indigo.opacity(0.4))
-                                    .frame(width: 7, height: 7)
-
-                                if i == 0 {
-                                    Rectangle()
-                                        .fill(
-                                            LinearGradient(
-                                                colors: [napTint, Color.indigo.opacity(0.5)],
-                                                startPoint: .top,
-                                                endPoint: .bottom
-                                            )
-                                        )
-                                        .frame(width: 2, height: 20)
-                                } else {
-                                    VStack(spacing: 3) {
-                                        ForEach(0..<4, id: \.self) { _ in
-                                            RoundedRectangle(cornerRadius: 1)
-                                                .fill(Color.indigo.opacity(0.4))
-                                                .frame(width: 2, height: 4)
-                                        }
-                                    }
-                                    .frame(height: 20)
-                                }
-
-                                Circle()
-                                    .strokeBorder(Color.indigo.opacity(0.5), lineWidth: 2)
-                                    .background(Circle().fill(Color(.systemBackground)))
-                                    .frame(width: 7, height: 7)
-                            }
-                            .frame(width: 2, alignment: .center)
-
+                    } label: {
+                        HStack {
+                            Text("Breaks (Wake Periods)")
+                                .font(.subheadline)
+                                .foregroundStyle(.primary)
                             Spacer()
+                            Text("\(napBreaks.count)")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.indigo)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 3)
+                                .background(Capsule().fill(Color.indigo.opacity(0.10)))
+                            Image(systemName: breaksExpanded ? "chevron.up" : "chevron.down")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.secondary)
                         }
-                        .frame(maxWidth: .infinity)
-
-                        BreakRowInCard(record: br)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 10)
                     }
+                    .buttonStyle(.plain)
 
-                    Spacer().frame(height: 4)
+                    if breaksExpanded {
+                        ForEach(napBreaks) { br in
+                            let brEnd = br.date.addingTimeInterval(TimeInterval(br.duration * 60))
+                            HStack {
+                                Text(TimeFormat.ampm(br.date))
+                                    .font(.subheadline)
+                                    .foregroundStyle(.primary)
+                                    .monospacedDigit()
+                                Spacer()
+                                Text("\(br.duration) min")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                                Image(systemName: "chevron.right")
+                                    .font(.caption2)
+                                    .foregroundStyle(.tertiary)
+                            }
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 8)
+
+                            if br.id != napBreaks.last?.id {
+                                Divider().padding(.leading, 14)
+                            }
+                        }
+                    }
                 }
             }
-            .background(
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .fill(Color(.systemBackground))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .stroke(Color.primary.opacity(0.06), lineWidth: 1)
-            )
-            .shadow(color: Color.black.opacity(0.04), radius: 8, x: 0, y: 2)
 
-            // Info banner — sadece kartın altında, bir kez
-            if !breaks.isEmpty {
-                infoBanner.padding(.top, 10)
+            Divider().padding(.horizontal, 14)
+
+            // ── Add Wake Period button ─────────────────────
+            Button(action: onAddBreakTap) {
+                HStack(spacing: 6) {
+                    Image(systemName: "plus")
+                        .font(.system(size: 13, weight: .semibold))
+                    Text("Add Wake Period")
+                        .font(.subheadline.weight(.semibold))
+                }
+                .foregroundStyle(.indigo)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
             }
+            .buttonStyle(.plain)
+            .padding(.horizontal, 14)
         }
-    }
-
-    private var infoBanner: some View {
-        HStack(spacing: 10) {
-            Image(systemName: "info.circle")
-                .font(.system(size: 14))
-                .foregroundStyle(.indigo.opacity(0.6))
-            Text("Breaks are part of this nap. They don't affect your total nap duration.")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-            Spacer()
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
         .background(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(Color.indigo.opacity(0.06))
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(Color(.systemBackground))
         )
-    }
-}
-
-// MARK: - BreakRowInCard
-
-private struct BreakRowInCard: View {
-    let record: SleepRecord
-
-    private var end: Date {
-        record.date.addingTimeInterval(TimeInterval(record.duration * 60))
-    }
-
-    var body: some View {
-        HStack(spacing: 14) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(Color.indigo.opacity(0.10))
-                    .frame(width: 52, height: 52)
-                Image(systemName: "cup.and.saucer.fill")
-                    .font(.system(size: 18, weight: .medium))
-                    .foregroundStyle(Color.indigo)
-            }
-            VStack(alignment: .leading, spacing: 3) {
-                Text("Break")
-                    .font(.headline)
-                    .foregroundStyle(.primary)
-                Text("\(TimeFormat.ampm(record.date)) – \(TimeFormat.ampm(end))")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .monospacedDigit()
-            }
-
-            Spacer()
-
-            HStack(spacing: 6) {
-                Text(TimeFormat.minutes(record.duration))
-                    .font(.headline.weight(.semibold))
-                    .foregroundStyle(.primary)
-                Image(systemName: "chevron.right")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.tertiary)
-            }
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
-    }
-}
-
-// MARK: - RoundedCorners (iOS 16 uyumlu köşe kontrolü)
-
-private struct RoundedCorners: Shape {
-    var tl: CGFloat = 0
-    var tr: CGFloat = 0
-    var bl: CGFloat = 0
-    var br: CGFloat = 0
-
-    func path(in rect: CGRect) -> Path {
-        var path = Path()
-        path.move(to: CGPoint(x: rect.minX + tl, y: rect.minY))
-        path.addLine(to: CGPoint(x: rect.maxX - tr, y: rect.minY))
-        path.addArc(center: CGPoint(x: rect.maxX - tr, y: rect.minY + tr),
-                    radius: tr, startAngle: .degrees(-90), endAngle: .degrees(0), clockwise: false)
-        path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY - br))
-        path.addArc(center: CGPoint(x: rect.maxX - br, y: rect.maxY - br),
-                    radius: br, startAngle: .degrees(0), endAngle: .degrees(90), clockwise: false)
-        path.addLine(to: CGPoint(x: rect.minX + bl, y: rect.maxY))
-        path.addArc(center: CGPoint(x: rect.minX + bl, y: rect.maxY - bl),
-                    radius: bl, startAngle: .degrees(90), endAngle: .degrees(180), clockwise: false)
-        path.addLine(to: CGPoint(x: rect.minX, y: rect.minY + tl))
-        path.addArc(center: CGPoint(x: rect.minX + tl, y: rect.minY + tl),
-                    radius: tl, startAngle: .degrees(180), endAngle: .degrees(270), clockwise: false)
-        path.closeSubpath()
-        return path
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .strokeBorder(
+                    Color.indigo.opacity(0.15),
+                    style: StrokeStyle(lineWidth: 1)
+                )
+        )
+        .shadow(color: .black.opacity(0.04), radius: 8, x: 0, y: 2)
     }
 }

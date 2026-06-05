@@ -11,13 +11,13 @@ struct SleepListView: View {
 
     enum ActiveSheet: Identifiable {
         case addSleep
-        case addBreak(napID: UUID, date: Date)
+        case addBreak(napID: UUID, date: Date, napDuration: Int)
         case dayDetail(SelectedDay)
 
         var id: String {
             switch self {
             case .addSleep: return "addSleep"
-            case .addBreak(let id, _): return "addBreak-\(id)"
+            case .addBreak(let id, _, _): return "addBreak-\(id)"
             case .dayDetail(let d): return "dayDetail-\(d.id)"
             }
         }
@@ -168,10 +168,13 @@ struct SleepListView: View {
                         saveRecords()
                     }
                 )
-            case .addBreak(let napID, let date):
+            case .addBreak(let napID, let date, let napDuration):
+                let existing = records.filter { $0.parentNapID == napID && $0.kind == .break }
                 AddBreakView(
                     defaultDate: date,
                     targetNapID: napID,
+                    napDuration: napDuration,
+                    existingBreaks: existing,
                     onSave: { newBreak in
                         records.append(newBreak)
                         saveRecords()
@@ -407,7 +410,10 @@ struct SleepListView: View {
                         let napEnd = nap.date.addingTimeInterval(TimeInterval(nap.duration * 60))
 
                         VStack(spacing: 0) {
-                            // Nap row
+                            // Nap row — tappable
+                            Button {
+                                activeSheet = .dayDetail(SelectedDay(day: nap.date))
+                            } label: {
                             HStack(spacing: 12) {
                                 ZStack {
                                     Circle()
@@ -444,6 +450,8 @@ struct SleepListView: View {
                             }
                             .padding(.horizontal, 14)
                             .padding(.vertical, 12)
+                            }
+                            .buttonStyle(.plain)
 
                             // Wake periods row (break'ler varsa)
                             if !napBreaks.isEmpty {
@@ -491,6 +499,24 @@ struct SleepListView: View {
                         if nap.id != todayNaps.last?.id {
                             Divider().padding(.leading, 14)
                         }
+
+                        // Add Wake Period button
+                        Divider().padding(.leading, 14)
+                        Button {
+                            activeSheet = .addBreak(napID: nap.id, date: nap.date, napDuration: nap.duration)
+                        } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: "plus")
+                                    .font(.system(size: 12, weight: .semibold))
+                                Text("Add Wake Period")
+                                    .font(.caption.weight(.semibold))
+                            }
+                            .foregroundStyle(.indigo)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 10)
+                        }
+                        .buttonStyle(.plain)
+                        .padding(.horizontal, 14)
                     }
                 }
                 .background(
