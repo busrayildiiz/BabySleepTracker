@@ -4,6 +4,8 @@ struct ContentView: View {
 
     @State private var selectedTab: Tab = .home
     @State private var showAddSheet = false
+    @State private var records: [SleepRecord] = []
+
 
     enum Tab {
         case home, history, insights, settings
@@ -18,7 +20,7 @@ struct ContentView: View {
                     .opacity(selectedTab == .home ? 1 : 0)
                     .allowsHitTesting(selectedTab == .home)
 
-                HistoryPlaceholderView()
+                HistoryView()
                     .opacity(selectedTab == .history ? 1 : 0)
                     .allowsHitTesting(selectedTab == .history)
 
