@@ -28,7 +28,7 @@ struct ContentView: View {
                     .opacity(selectedTab == .insights ? 1 : 0)
                     .allowsHitTesting(selectedTab == .insights)
 
-                SettingsPlaceholderView()
+                SettingsView()
                     .opacity(selectedTab == .settings ? 1 : 0)
                     .allowsHitTesting(selectedTab == .settings)
             }

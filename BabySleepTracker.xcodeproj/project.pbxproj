@@ -14,6 +14,7 @@
 		FA9DB0992FD37964000B9211 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA9DB0982FD37964000B9211 /* ContentView.swift */; };
 		FA9DB09B2FD44532000B9211 /* HistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA9DB09A2FD44532000B9211 /* HistoryView.swift */; };
 		FA9DB09D2FD44997000B9211 /* InsightView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA9DB09C2FD44997000B9211 /* InsightView.swift */; };
+		FA9DB09F2FD44B3F000B9211 /* SettingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA9DB09E2FD44B3F000B9211 /* SettingView.swift */; };
 		FAEF10442F4E207F00E76FD4 /* BabySleepTrackerApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAEF10432F4E207F00E76FD4 /* BabySleepTrackerApp.swift */; };
 		FAEF10462F4E207F00E76FD4 /* SleepListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAEF10452F4E207F00E76FD4 /* SleepListView.swift */; };
 		FAEF10482F4E208000E76FD4 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = FAEF10472F4E208000E76FD4 /* Assets.xcassets */; };
@@ -53,6 +54,7 @@
 		FA9DB0982FD37964000B9211 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		FA9DB09A2FD44532000B9211 /* HistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryView.swift; sourceTree = "<group>"; };
 		FA9DB09C2FD44997000B9211 /* InsightView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InsightView.swift; sourceTree = "<group>"; };
+		FA9DB09E2FD44B3F000B9211 /* SettingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingView.swift; sourceTree = "<group>"; };
 		FAEF10402F4E207F00E76FD4 /* BabySleepTracker.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BabySleepTracker.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		FAEF10432F4E207F00E76FD4 /* BabySleepTrackerApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BabySleepTrackerApp.swift; sourceTree = "<group>"; };
 		FAEF10452F4E207F00E76FD4 /* SleepListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepListView.swift; sourceTree = "<group>"; };
@@ -105,7 +107,7 @@
 		FAEF10372F4E207F00E76FD4 = {
 			isa = PBXGroup;
 			children = (
-				FA9DB09C2FD44997000B9211 /* InsightView.swift */,
+				FA9DB09E2FD44B3F000B9211 /* SettingView.swift */,
 				FAEF10422F4E207F00E76FD4 /* BabySleepTracker */,
 				FA5488D12FAEB964002BC18B /* BabySleepTrackerTests */,
 				FAEF10412F4E207F00E76FD4 /* Products */,
@@ -159,6 +161,7 @@
 			isa = PBXGroup;
 			children = (
 				FA9DB0982FD37964000B9211 /* ContentView.swift */,
+				FA9DB09C2FD44997000B9211 /* InsightView.swift */,
 				FA9DB09A2FD44532000B9211 /* HistoryView.swift */,
 				FAEF106F2F530D3100E76FD4 /* SleepRecordRow.swift */,
 				FAEF10712F536DB200E76FD4 /* NapPickerView.swift */,
@@ -310,6 +313,7 @@
 				FAEF106A2F4E5D0100E76FD4 /* DayDetailViewModel.swift in Sources */,
 				FA9DB09D2FD44997000B9211 /* InsightView.swift in Sources */,
 				FAEF10502F4E208000E76FD4 /* BabySleepTracker.xcdatamodeld in Sources */,
+				FA9DB09F2FD44B3F000B9211 /* SettingView.swift in Sources */,
 				FA5488CB2FAEB831002BC18B /* SleepAPI.swift in Sources */,
 				FAEF105B2F4E210600E76FD4 /* SleepRecord.swift in Sources */,
 				FAEF10592F4E20D600E76FD4 /* AddRecordView.swift in Sources */,
@@ -502,6 +506,7 @@
 				DEVELOPMENT_TEAM = 2GF6Y44N8Z;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "BabySleepTracker needs access to your photo library so you can choose a profile photo for your baby.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -531,6 +536,7 @@
 				DEVELOPMENT_TEAM = 2GF6Y44N8Z;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "BabySleepTracker needs access to your photo library so you can choose a profile photo for your baby.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
