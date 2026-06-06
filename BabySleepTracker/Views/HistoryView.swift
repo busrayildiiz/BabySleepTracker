@@ -1,22 +1,14 @@
-//
-//  HistoryView.swift
-//  BabySleepTracker
-//
-//  Created by MacBook on 6.06.2026.
-//
-
-import Foundation
 import SwiftUI
 import Charts
 
 struct HistoryView: View {
 
+    @State private var records: [SleepRecord] = []
     @State private var selectedDate: Date = Date()
     @State private var currentWeekOffset: Int = 0
     @State private var animateChart = false
 
-    @State private var records: [SleepRecord] = []
-
+    private let calendar = Calendar.current
 
     private func loadRecords() {
         if let data = UserDefaults.standard.data(forKey: "sleepRecords"),
@@ -24,8 +16,6 @@ struct HistoryView: View {
             records = decoded
         }
     }
-    
-    private let calendar = Calendar.current
 
     // MARK: - Week days
 
@@ -135,44 +125,46 @@ struct HistoryView: View {
     // MARK: - Body
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
 
-                // ── Header ─────────────────────────────
-                headerSection
+                    // ── Header ─────────────────────────────
+                    headerSection
 
-                // ── Calendar strip ─────────────────────
-                calendarStrip
+                    // ── Calendar strip ─────────────────────
+                    calendarStrip
 
-                // ── Selected day card ──────────────────
-                selectedDayCard
+                    // ── Selected day card ──────────────────
+                    selectedDayCard
 
-                // ── Stats row ──────────────────────────
-                statsRow
+                    // ── Stats row ──────────────────────────
+                    statsRow
 
-                // ── Today's naps ───────────────────────
-                if !selectedDayNaps.isEmpty {
-                    napsSection
+                    // ── Today's naps ───────────────────────
+                    if !selectedDayNaps.isEmpty {
+                        napsSection
+                    }
+
+                    // ── Comparison banner ──────────────────
+                    if yesterdayNetSleep > 0 || selectedDayNetSleep > 0 {
+                        comparisonBanner
+                    }
+
+                    // ── Week overview chart ────────────────
+                    weekChartCard
+
+                    // ── Tip ────────────────────────────────
+                    tipCard
                 }
-
-                // ── Comparison banner ──────────────────
-                if yesterdayNetSleep > 0 || selectedDayNetSleep > 0 {
-                    comparisonBanner
-                }
-
-                // ── Week overview chart ────────────────
-                weekChartCard
-
-                // ── Tip ────────────────────────────────
-                tipCard
+                .padding(.horizontal, 16)
+                .padding(.top, 16)
+                .padding(.bottom, 32)
             }
-            .padding(.horizontal, 16)
-            .padding(.top, 16)
-            .padding(.bottom, 32)
+            .background(Color(.systemGroupedBackground))
+            .navigationBarHidden(true)
+            .onAppear { loadRecords() }
         }
-        .background(Color(.systemGroupedBackground))
-        .onAppear { loadRecords() }
-        
     }
 
     // MARK: - Header
