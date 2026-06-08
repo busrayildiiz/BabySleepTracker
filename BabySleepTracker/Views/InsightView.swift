@@ -1,550 +1,532 @@
-//
-//  InsightView.swift
-//  BabySleepTracker
-//
-//  Created by MacBook on 6.06.2026.
-//
-
-import Foundation
 import SwiftUI
-import Charts
 
 struct InsightsView: View {
+    private enum CoachTab: String, CaseIterable {
+        case overview = "Overview"
+        case predictions = "Predictions"
 
-    @State private var records: [SleepRecord] = []
-    @State private var animateChart = false
+        var icon: String {
+            self == .overview ? "sparkles" : "chart.line.uptrend.xyaxis"
+        }
+    }
+
+    @State private var selectedTab: CoachTab = .overview
+    @State private var snapshot = SleepCoachService.shared.generateSnapshot()
     @AppStorage("babyName") private var babyName: String = "Baby"
-
-    private let calendar = Calendar.current
-
-    private func loadRecords() {
-        if let data = UserDefaults.standard.data(forKey: "sleepRecords"),
-           let decoded = try? JSONDecoder().decode([SleepRecord].self, from: data) {
-            records = decoded
-        }
-    }
-
-    // MARK: - Computed stats
-
-    private var napsOnly: [SleepRecord] {
-        records.filter { $0.kind != .break }
-    }
-
-    private var breaksOnly: [SleepRecord] {
-        records.filter { $0.kind == .break }
-    }
-
-    private func netMinutes(_ nap: SleepRecord) -> Int {
-        nap.totalMinutes(breaks: breaksOnly)
-    }
-
-    // Bu haftaki günlük ortalama
-    private var weeklyAverageNap: Int {
-        let sevenAgo = calendar.date(byAdding: .day, value: -7, to: Date())!
-        let thisWeek = napsOnly.filter { $0.date >= sevenAgo }
-        guard !thisWeek.isEmpty else { return 0 }
-        let total = thisWeek.reduce(0) { $0 + netMinutes($1) }
-        return total / max(1, Set(thisWeek.map { calendar.startOfDay(for: $0.date) }).count)
-    }
-
-    // Consistency: son 7 günde kaç gün kayıt var
-    private var consistencyPercent: Int {
-        let days = (0..<7).compactMap { calendar.date(byAdding: .day, value: -$0, to: Date()) }
-        let active = days.filter { day in
-            napsOnly.contains { calendar.isDate($0.date, inSameDayAs: day) }
-        }.count
-        return Int(Double(active) / 7.0 * 100)
-    }
-
-    private var consistencyLabel: String {
-        switch consistencyPercent {
-        case 86...100: return "Excellent"
-        case 57...85:  return "Good"
-        case 29...56:  return "Fair"
-        default:       return "Low"
-        }
-    }
-
-    // En uzun nap
-    private var longestNap: SleepRecord? {
-        napsOnly.max { netMinutes($0) < netMinutes($1) }
-    }
-
-    private var longestNapDate: String {
-        guard let n = longestNap else { return "–" }
-        let f = DateFormatter()
-        f.locale = Locale(identifier: "en_US")
-        f.dateFormat = "MMM d"
-        return f.string(from: n.date)
-    }
-
-    // Son 30 gün günlük toplam (chart için)
-    struct DailySleep: Identifiable {
-        let id = UUID()
-        let date: Date
-        let minutes: Int
-    }
-
-    private var last30Days: [DailySleep] {
-        let today = calendar.startOfDay(for: Date())
-        return (0..<30).reversed().map { offset in
-            let day = calendar.date(byAdding: .day, value: -offset, to: today)!
-            let dayNaps = napsOnly.filter { calendar.isDate($0.date, inSameDayAs: day) }
-            let total = dayNaps.reduce(0) { $0 + netMinutes($1) }
-            return DailySleep(date: day, minutes: total)
-        }
-    }
-
-    private var chartMax: Int {
-        let maxVal = last30Days.map { $0.minutes }.max() ?? 60
-        return max(120, Int(ceil(Double(maxVal) / 60.0)) * 60)
-    }
-
-    // MARK: - Body
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
-                    headerSection
-                    statsCards
-                    observationCard
-                    patternAndTrendCards
-                    durationChartCard
-                    feedingConnectionCard
-                    sleepCoachCard
+            ScrollView(showsIndicators: false) {
+                VStack(spacing: 14) {
+                    header
+                    tabPicker
+
+                    if selectedTab == .overview {
+                        predictionCard
+                        todayPlanCard
+                        insightsCard
+                        coachTipCard
+                    } else {
+                        predictionDetails
+                    }
                 }
                 .padding(.horizontal, 16)
-                .padding(.top, 16)
-                .padding(.bottom, 32)
+                .padding(.top, 34)
+                .padding(.bottom, 112)
             }
-            .background(Color(.systemGroupedBackground))
+            .background(CoachColor.background)
             .navigationBarHidden(true)
-            .onAppear {
-                loadRecords()
-                animateChart = false
-                withAnimation(.easeOut(duration: 0.8)) { animateChart = true }
-            }
+            .onAppear(perform: refresh)
+            .onReceive(NotificationCenter.default.publisher(for: .sleepRecordsDidChange)) { _ in refresh() }
+            .onReceive(NotificationCenter.default.publisher(for: .dailyWakeRecordsDidChange)) { _ in refresh() }
+            .environment(\.locale, Locale(identifier: "en_US"))
         }
     }
 
-    // MARK: - Header
-
-    private var headerSection: some View {
-        HStack(alignment: .top) {
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 6) {
-                    Text("Insights")
-                        .font(.largeTitle.weight(.bold))
-                    Text("✨")
+    private var header: some View {
+        HStack(alignment: .center, spacing: 12) {
+            VStack(alignment: .leading, spacing: 5) {
+                HStack(spacing: 7) {
+                    Text("AI Coach")
+                        .font(.system(size: 27, weight: .bold, design: .rounded))
+                        .foregroundStyle(CoachColor.ink)
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 17, weight: .bold))
+                        .foregroundStyle(CoachColor.purple)
                 }
-                HStack(spacing: 4) {
-                    Text("Understand \(babyName)'s sleep better")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                    Text("💜")
+
+                HStack(spacing: 5) {
+                    Text("\(displayedBabyName)'s intelligent sleep assistant")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(CoachColor.muted)
+                    Image(systemName: "info.circle")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(CoachColor.muted)
                 }
             }
-            Spacer()
-            ZStack {
-                Circle()
-                    .stroke(Color.indigo.opacity(0.2), lineWidth: 1.5)
-                    .frame(width: 36, height: 36)
-                Image(systemName: "info")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(.indigo)
-            }
+
+            Spacer(minLength: 8)
+            CoachMoonArtwork()
+                .frame(width: 92, height: 68)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    // MARK: - Stats Cards (3'lü grid)
-
-    private var statsCards: some View {
-        HStack(spacing: 10) {
-            // Average Nap
-            statCard(
-                icon: "sun.max.fill",
-                iconColor: .orange,
-                label: "Average Nap",
-                value: weeklyAverageNap > 0 ? TimeFormat.minutes(weeklyAverageNap) : "–",
-                sub: "This Week",
-                decoration: AnyView(miniLineDecoration),
-                accentColor: .orange
-            )
-
-            // Consistency
-            statCard(
-                icon: "leaf.fill",
-                iconColor: .green,
-                label: "Consistency",
-                value: napsOnly.isEmpty ? "–" : consistencyLabel,
-                sub: "\(consistencyPercent)%",
-                decoration: AnyView(
-                    Image(systemName: "heart")
-                        .font(.system(size: 18))
-                        .foregroundStyle(.pink.opacity(0.5))
-                        .frame(maxWidth: .infinity, alignment: .trailing)
-                        .padding(.trailing, 4)
-                ),
-                accentColor: .green
-            )
-
-            // Longest Nap
-            statCard(
-                icon: "moon.fill",
-                iconColor: .indigo,
-                label: "Longest Nap",
-                value: longestNap != nil ? TimeFormat.minutes(netMinutes(longestNap!)) : "–",
-                sub: longestNapDate,
-                decoration: AnyView(
-                    Image(systemName: "star.fill")
-                        .font(.system(size: 18))
-                        .foregroundStyle(.orange.opacity(0.6))
-                        .frame(maxWidth: .infinity, alignment: .trailing)
-                        .padding(.trailing, 4)
-                ),
-                accentColor: .indigo
-            )
-        }
-    }
-
-    private func statCard(icon: String, iconColor: Color, label: String,
-                          value: String, sub: String,
-                          decoration: AnyView, accentColor: Color) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 5) {
-                Image(systemName: icon)
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(iconColor)
-                Text(label)
-                    .font(.caption2)
-                    .foregroundStyle(accentColor)
+    private var tabPicker: some View {
+        HStack(spacing: 4) {
+            ForEach(CoachTab.allCases, id: \.self) { tab in
+                Button {
+                    withAnimation(.easeInOut(duration: 0.18)) {
+                        selectedTab = tab
+                    }
+                } label: {
+                    Label(tab.rawValue, systemImage: tab.icon)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(selectedTab == tab ? Color.white : CoachColor.muted)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 9)
+                        .background(
+                            RoundedRectangle(cornerRadius: 9, style: .continuous)
+                                .fill(selectedTab == tab ? CoachColor.purple : Color.clear)
+                        )
+                }
+                .buttonStyle(.plain)
             }
-
-            Text(value)
-                .font(.title3.weight(.bold))
-                .foregroundStyle(.primary)
-                .minimumScaleFactor(0.7)
-                .lineLimit(1)
-
-            Text(sub)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-
-            Spacer(minLength: 0)
-            decoration
         }
-        .frame(maxWidth: .infinity, minHeight: 110, alignment: .topLeading)
-        .padding(12)
+        .padding(4)
         .background(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(Color(.systemBackground))
+            RoundedRectangle(cornerRadius: 11, style: .continuous)
+                .fill(Color.white)
+                .shadow(color: CoachColor.ink.opacity(0.04), radius: 10, y: 4)
         )
-        .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .stroke(Color.primary.opacity(0.05), lineWidth: 1)
-        )
+        .overlay(cardStroke(cornerRadius: 11))
     }
 
-    // Mini line decoration for Average Nap card
-    private var miniLineDecoration: some View {
-        GeometryReader { geo in
-            let data = last30Days.suffix(10).map { $0.minutes }
-            let maxVal = CGFloat(data.max() ?? 1)
-            let points = data.enumerated().map { (i, val) -> CGPoint in
-                let x = geo.size.width * CGFloat(i) / CGFloat(max(data.count - 1, 1))
-                let y = geo.size.height * (1 - CGFloat(val) / maxVal)
-                return CGPoint(x: x, y: y)
-            }
-            if points.count > 1 {
-                Path { path in
-                    path.move(to: points[0])
-                    for pt in points.dropFirst() { path.addLine(to: pt) }
-                }
-                .stroke(Color.indigo.opacity(0.4), style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
-            }
-        }
-        .frame(height: 28)
-    }
-
-    // MARK: - Observation Card
-
-    private var observationCard: some View {
-        ZStack(alignment: .topLeading) {
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(Color.orange.opacity(0.07))
-
-            Text("☁️")
-                .font(.system(size: 60))
-                .opacity(0.5)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
-                .padding(.trailing, 12)
-                .padding(.top, 8)
-
-            VStack(alignment: .leading, spacing: 10) {
-                HStack(spacing: 6) {
-                    Image(systemName: "sun.max.fill")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(.orange)
-                    Text("Observation")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.orange)
-                }
-
-                Text("\(babyName) tends to sleep longer between 11 AM and 1 PM.")
-                    .font(.body)
-                    .foregroundStyle(.primary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            .padding(16)
-        }
-        .frame(maxWidth: .infinity, minHeight: 100)
-    }
-
-    // MARK: - Pattern & Trend Cards
-
-    private var patternAndTrendCards: some View {
-        HStack(spacing: 10) {
-            // Pattern Found
-            VStack(alignment: .leading, spacing: 10) {
-                HStack(spacing: 6) {
-                    Image(systemName: "moon.fill")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(.indigo)
-                    Text("Pattern Found")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                }
-
-                Text("Wake periods usually happen within the first 30 minutes.")
-                    .font(.subheadline)
-                    .foregroundStyle(.primary)
-                    .fixedSize(horizontal: false, vertical: true)
-
-                Spacer(minLength: 0)
-
-                HStack {
-                    Spacer()
-                    Image(systemName: "clock")
-                        .font(.system(size: 24))
-                        .foregroundStyle(.indigo.opacity(0.25))
-                }
-            }
-            .frame(maxWidth: .infinity, minHeight: 140, alignment: .topLeading)
-            .padding(14)
-            .background(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .fill(Color(.systemBackground))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .stroke(Color.primary.opacity(0.05), lineWidth: 1)
-            )
-
-            // Trend
-            VStack(alignment: .leading, spacing: 10) {
-                HStack(spacing: 6) {
-                    Image(systemName: "leaf.fill")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(.green)
-                    Text("Trend")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                }
-
-                Text("Average nap duration increased 12% compared to last week.")
-                    .font(.subheadline)
-                    .foregroundStyle(.primary)
-                    .fixedSize(horizontal: false, vertical: true)
-
-                Spacer(minLength: 0)
-
-                HStack {
-                    Spacer()
-                    Image(systemName: "arrow.up.right")
-                        .font(.system(size: 24, weight: .semibold))
-                        .foregroundStyle(.green.opacity(0.4))
-                }
-            }
-            .frame(maxWidth: .infinity, minHeight: 140, alignment: .topLeading)
-            .padding(14)
-            .background(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .fill(Color(.systemBackground))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .stroke(Color.primary.opacity(0.05), lineWidth: 1)
-            )
-        }
-    }
-
-    // MARK: - Duration Chart
-
-    private var durationChartCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
+    private var predictionCard: some View {
+        VStack(alignment: .leading, spacing: 13) {
             HStack {
-                Text("Average Nap Duration")
-                    .font(.headline.weight(.semibold))
+                Text("NEXT NAP PREDICTION")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(CoachColor.purple)
                 Spacer()
-                HStack(spacing: 4) {
-                    Text("Last 30 Days")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Image(systemName: "chevron.down")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 5)
-                .background(
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(Color(.secondarySystemGroupedBackground))
-                )
+                learningBadge
             }
 
-            Chart(last30Days) { item in
-                BarMark(
-                    x: .value("Date", item.date, unit: .day),
-                    y: .value("Min", animateChart ? item.minutes : 0)
+            HStack(alignment: .top, spacing: 14) {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(alignment: .center, spacing: 10) {
+                        iconCircle("sun.max.fill", color: CoachColor.sun, size: 42)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Recommended nap time")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(CoachColor.ink)
+                            Text(time(snapshot.prediction.recommendedTime))
+                                .font(.system(size: 27, weight: .bold, design: .rounded))
+                                .foregroundStyle(CoachColor.purpleDeep)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.75)
+                        }
+                    }
+
+                    Text("\(snapshot.prediction.confidence)% Confidence")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(CoachColor.purpleDeep)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(
+                            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                                .fill(CoachColor.purple.opacity(0.10))
+                        )
+
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("Recommended window")
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundStyle(CoachColor.muted)
+                        Text("\(time(snapshot.prediction.windowStart)) - \(time(snapshot.prediction.windowEnd))")
+                            .font(.system(size: 13, weight: .bold, design: .rounded))
+                            .foregroundStyle(CoachColor.purpleDeep)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Why this time?")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(CoachColor.ink)
+
+                    ForEach(snapshot.prediction.reasons, id: \.self) { reason in
+                        HStack(alignment: .top, spacing: 7) {
+                            Image(systemName: "checkmark.circle.fill")
+                                .font(.system(size: 12))
+                                .foregroundStyle(CoachColor.green)
+                                .padding(.top, 1)
+                            Text(reason)
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundStyle(CoachColor.muted)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(11)
+                .background(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(CoachColor.purple.opacity(0.055))
                 )
-                .cornerRadius(4)
-                .foregroundStyle(Color.indigo.opacity(0.25))
             }
-            .chartYScale(domain: 0...chartMax)
-            .chartYAxis {
-                AxisMarks(values: [0, chartMax / 2, chartMax]) { value in
-                    AxisGridLine(stroke: StrokeStyle(lineWidth: 1, dash: [4, 4]))
-                        .foregroundStyle(Color.primary.opacity(0.07))
-                    AxisValueLabel {
-                        if let m = value.as(Int.self) {
-                            Text("\(m / 60)h")
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
+        }
+        .padding(15)
+        .background(cardBackground)
+        .overlay(cardStroke(cornerRadius: 16))
+    }
+
+    private var learningBadge: some View {
+        Text(modeLabel)
+            .font(.system(size: 9, weight: .bold))
+            .foregroundStyle(snapshot.prediction.mode == .personalized ? CoachColor.green : CoachColor.purpleDeep)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 5)
+            .background(
+                Capsule()
+                    .fill(
+                        snapshot.prediction.mode == .personalized
+                            ? CoachColor.green.opacity(0.10)
+                            : CoachColor.purple.opacity(0.10)
+                    )
+            )
+    }
+
+    private var todayPlanCard: some View {
+        VStack(alignment: .leading, spacing: 13) {
+            Label("TODAY'S PLAN", systemImage: "calendar")
+                .font(.system(size: 10, weight: .bold))
+                .foregroundStyle(CoachColor.purple)
+
+            HStack(alignment: .top, spacing: 0) {
+                ForEach(Array(snapshot.plan.prefix(4).enumerated()), id: \.element.id) { index, item in
+                    VStack(spacing: 6) {
+                        iconCircle(
+                            item.icon,
+                            color: item.icon.contains("sun") ? CoachColor.sun : CoachColor.purple,
+                            size: 34
+                        )
+                        Text(time(item.time))
+                            .font(.system(size: 9, weight: .semibold))
+                            .foregroundStyle(item.isPrediction ? CoachColor.purpleDeep : CoachColor.muted)
+                            .lineLimit(1)
+                        Text(item.title)
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundStyle(CoachColor.ink)
+                            .lineLimit(1)
+                        Text(item.detail)
+                            .font(.system(size: 9, weight: .medium))
+                            .foregroundStyle(item.isPrediction ? CoachColor.purpleDeep : CoachColor.muted)
+                            .lineLimit(1)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .overlay(alignment: .topTrailing) {
+                        if index < min(snapshot.plan.count, 4) - 1 {
+                            Rectangle()
+                                .fill(CoachColor.stroke)
+                                .frame(height: 1)
+                                .offset(x: 12, y: 17)
                         }
                     }
                 }
             }
-            .chartXAxis {
-                AxisMarks(values: .stride(by: .weekOfYear)) { _ in
-                    AxisValueLabel(format: .dateTime.month(.abbreviated).day())
-                        .font(.caption2)
+
+            HStack(spacing: 7) {
+                Image(systemName: "sparkles")
+                    .foregroundStyle(CoachColor.purple)
+                Text("The plan adjusts as the day goes on. Predictions refresh after every new record.")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(CoachColor.muted)
+            }
+            .padding(10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(CoachColor.purple.opacity(0.055))
+            )
+        }
+        .padding(15)
+        .background(cardBackground)
+        .overlay(cardStroke(cornerRadius: 16))
+    }
+
+    private var insightsCard: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 5) {
+                Image(systemName: "sparkles")
+                Text("\(displayedBabyName.uppercased())'S SLEEP INSIGHTS")
+            }
+            .font(.system(size: 10, weight: .bold))
+            .foregroundStyle(CoachColor.purple)
+            .padding(.bottom, 8)
+
+            ForEach(Array(snapshot.insights.enumerated()), id: \.element.id) { index, insight in
+                insightRow(insight)
+                if index < snapshot.insights.count - 1 {
+                    Divider()
+                        .overlay(CoachColor.stroke)
+                        .padding(.leading, 48)
                 }
             }
-            .frame(height: 160)
         }
-        .padding(16)
-        .background(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(Color(.systemBackground))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .stroke(Color.primary.opacity(0.05), lineWidth: 1)
-        )
+        .padding(15)
+        .background(cardBackground)
+        .overlay(cardStroke(cornerRadius: 16))
     }
 
-    // MARK: - Feeding Connection (V2 placeholder)
+    private func insightRow(_ insight: SleepCoachInsight) -> some View {
+        HStack(spacing: 11) {
+            iconCircle(insight.icon, color: toneColor(insight.tone), size: 38)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(insight.title)
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(CoachColor.ink)
+                Text(insight.detail)
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(CoachColor.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 6)
+            Text(insight.value)
+                .font(.system(size: 11, weight: .bold, design: .rounded))
+                .foregroundStyle(toneColor(insight.tone))
+                .multilineTextAlignment(.trailing)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 6)
+                .background(
+                    RoundedRectangle(cornerRadius: 7, style: .continuous)
+                        .fill(toneColor(insight.tone).opacity(0.08))
+                )
+        }
+        .padding(.vertical, 9)
+    }
 
-    private var feedingConnectionCard: some View {
-        HStack(spacing: 14) {
+    private var coachTipCard: some View {
+        HStack(spacing: 13) {
             ZStack {
-                Circle()
-                    .fill(Color.orange.opacity(0.12))
-                    .frame(width: 44, height: 44)
-                Image(systemName: "fork.knife")
-                    .font(.system(size: 18, weight: .medium))
-                    .foregroundStyle(.orange)
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(CoachColor.purple.opacity(0.10))
+                    .frame(width: 56, height: 56)
+                Image(systemName: "brain.head.profile")
+                    .font(.system(size: 25, weight: .medium))
+                    .foregroundStyle(CoachColor.purpleDeep)
             }
 
-            VStack(alignment: .leading, spacing: 3) {
-                Text("Sleep & Feeding Connection")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.primary)
-                Text("Days with solid meals in the afternoon show 18% longer naps on average.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 4) {
+                Label("AI COACH TIP", systemImage: "sparkles")
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundStyle(CoachColor.purple)
+                Text(tipTitle)
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(CoachColor.ink)
+                Text(snapshot.coachTip)
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(CoachColor.muted)
+                    .fixedSize(horizontal: false, vertical: true)
             }
-
-            Spacer()
-
-            Image(systemName: "chevron.right")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.tertiary)
         }
-        .padding(14)
-        .background(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(Color(.systemBackground))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .stroke(Color.primary.opacity(0.05), lineWidth: 1)
-        )
+        .padding(15)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(cardBackground)
+        .overlay(cardStroke(cornerRadius: 16))
     }
 
-    // MARK: - Sleep Coach (V2 AI placeholder)
+    private var predictionDetails: some View {
+        VStack(spacing: 14) {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("Prediction status")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundStyle(CoachColor.ink)
+                        Text(modeDescription)
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(CoachColor.muted)
+                    }
+                    Spacer()
+                    learningBadge
+                }
 
-    private var sleepCoachCard: some View {
-        HStack(spacing: 14) {
+                ProgressView(value: min(Double(snapshot.prediction.trackedDays), 14), total: 14)
+                    .tint(CoachColor.purpleDeep)
+
+                HStack {
+                    Text("\(min(snapshot.prediction.trackedDays, 14)) tracked days")
+                    Spacer()
+                    Text(snapshot.prediction.mode == .personalized ? "Personalized" : "14 days")
+                }
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(CoachColor.muted)
+            }
+            .padding(15)
+            .background(cardBackground)
+            .overlay(cardStroke(cornerRadius: 16))
+
+            VStack(alignment: .leading, spacing: 12) {
+                Text("How this prediction was formed")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(CoachColor.ink)
+                ForEach(Array(snapshot.prediction.reasons.enumerated()), id: \.offset) { index, reason in
+                    HStack(alignment: .top, spacing: 10) {
+                        Text("\(index + 1)")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundStyle(Color.white)
+                            .frame(width: 22, height: 22)
+                            .background(Circle().fill(CoachColor.purpleDeep))
+                        Text(reason)
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(CoachColor.ink)
+                    }
+                }
+            }
+            .padding(15)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(cardBackground)
+            .overlay(cardStroke(cornerRadius: 16))
+
+            VStack(alignment: .leading, spacing: 5) {
+                Label("Health guardrail", systemImage: "shield.checkered")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(CoachColor.green)
+                Text(healthGuardrailText)
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(CoachColor.muted)
+            }
+            .padding(15)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(cardBackground)
+            .overlay(cardStroke(cornerRadius: 16))
+        }
+    }
+
+    private var displayedBabyName: String {
+        let trimmed = babyName.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? snapshot.babyName : trimmed
+    }
+
+    private var modeLabel: String {
+        switch snapshot.prediction.mode {
+        case .baseline: return "AGE BASELINE"
+        case .learning: return "LEARNING \(min(snapshot.prediction.trackedDays, 14))/14"
+        case .personalized: return "PERSONALIZED"
+        }
+    }
+
+    private var modeDescription: String {
+        switch snapshot.prediction.mode {
+        case .baseline:
+            return "Using the age baseline until sleep and wake records are added."
+        case .learning:
+            return "Gradually blending the age baseline with \(displayedBabyName)'s observed rhythm."
+        case .personalized:
+            return "Predictions now prioritize \(displayedBabyName)'s own sleep rhythm."
+        }
+    }
+
+    private var tipTitle: String {
+        snapshot.prediction.hasTodayWakeTime ? "Follow the window, then follow the baby" : "Start with today's wake-up time"
+    }
+
+    private var healthGuardrailText: String {
+        if snapshot.guideline.minimumDailyMinutes == 0 {
+            return "AAP-endorsed guidance does not set a fixed sleep-duration target before 4 months. The nap estimate uses the product baseline and \(displayedBabyName)'s own records."
+        }
+        return "AAP-endorsed guidance is used to check total sleep over 24 hours. The exact nap time comes from the age baseline and \(displayedBabyName)'s own data."
+    }
+
+    private var cardBackground: some View {
+        RoundedRectangle(cornerRadius: 16, style: .continuous)
+            .fill(Color.white)
+            .shadow(color: CoachColor.ink.opacity(0.035), radius: 12, y: 6)
+    }
+
+    private func cardStroke(cornerRadius: CGFloat) -> some View {
+        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+            .stroke(CoachColor.stroke, lineWidth: 1)
+    }
+
+    private func iconCircle(_ icon: String, color: Color, size: CGFloat) -> some View {
+        ZStack {
+            Circle()
+                .fill(color.opacity(0.11))
+                .frame(width: size, height: size)
+            Image(systemName: icon)
+                .font(.system(size: size * 0.43, weight: .semibold))
+                .foregroundStyle(color)
+        }
+    }
+
+    private func toneColor(_ tone: String) -> Color {
+        switch tone {
+        case "green": return CoachColor.green
+        case "pink": return CoachColor.pink
+        default: return CoachColor.purpleDeep
+        }
+    }
+
+    private func time(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US")
+        formatter.dateFormat = "h:mm a"
+        return formatter.string(from: date)
+    }
+
+    private func refresh() {
+        snapshot = SleepCoachService.shared.generateSnapshot()
+    }
+}
+
+private struct CoachMoonArtwork: View {
+    var body: some View {
+        GeometryReader { geometry in
+            let width = geometry.size.width
+            let height = geometry.size.height
             ZStack {
+                Image(systemName: "sparkle")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(CoachColor.purple.opacity(0.55))
+                    .position(x: width * 0.13, y: height * 0.32)
+                Image(systemName: "star.fill")
+                    .font(.system(size: 10))
+                    .foregroundStyle(CoachColor.sun.opacity(0.85))
+                    .position(x: width * 0.86, y: height * 0.33)
+
                 Circle()
-                    .fill(Color.pink.opacity(0.12))
-                    .frame(width: 44, height: 44)
-                Image(systemName: "heart.fill")
-                    .font(.system(size: 18, weight: .medium))
-                    .foregroundStyle(.pink)
-            }
+                    .fill(Color.white.opacity(0.92))
+                    .frame(width: width * 0.68, height: width * 0.68)
+                    .shadow(color: CoachColor.purple.opacity(0.14), radius: 13)
+                    .position(x: width * 0.56, y: height * 0.50)
 
-            VStack(alignment: .leading, spacing: 3) {
-                Text("Sleep Coach")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.primary)
-                Text("Based on last 14 days, \(babyName) seems ready for a nap around 12:15 PM.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
+                Circle()
+                    .fill(CoachColor.background)
+                    .frame(width: width * 0.56, height: width * 0.56)
+                    .position(x: width * 0.70, y: height * 0.36)
 
-            Spacer()
-
-            VStack(spacing: 6) {
-                // V2 badge
-                Text("V2")
-                    .font(.caption2.weight(.bold))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 3)
-                    .background(Capsule().fill(Color.indigo))
-
-                Text("🌟")
-                    .font(.system(size: 22))
+                Path { path in
+                    path.move(to: CGPoint(x: width * 0.39, y: height * 0.57))
+                    path.addQuadCurve(
+                        to: CGPoint(x: width * 0.61, y: height * 0.57),
+                        control: CGPoint(x: width * 0.50, y: height * 0.69)
+                    )
+                }
+                .stroke(CoachColor.purpleDeep, style: StrokeStyle(lineWidth: 2.3, lineCap: .round))
             }
-        }
-        .padding(14)
-        .background(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(Color(.systemBackground))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .stroke(Color.indigo.opacity(0.15), lineWidth: 1)
-        )
-        .overlay(alignment: .topTrailing) {
-            // AI powered badge
-            HStack(spacing: 4) {
-                Image(systemName: "sparkles")
-                    .font(.system(size: 9, weight: .semibold))
-                Text("AI Powered")
-                    .font(.system(size: 9, weight: .semibold))
-            }
-            .foregroundStyle(.indigo)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(
-                Capsule()
-                    .fill(Color.indigo.opacity(0.10))
-            )
-            .padding(10)
         }
     }
+}
+
+private enum CoachColor {
+    static let background = Color(red: 0.985, green: 0.98, blue: 1.0)
+    static let ink = Color(red: 0.035, green: 0.04, blue: 0.22)
+    static let muted = Color(red: 0.38, green: 0.39, blue: 0.52)
+    static let purple = Color(red: 0.55, green: 0.45, blue: 0.96)
+    static let purpleDeep = Color(red: 0.38, green: 0.27, blue: 0.88)
+    static let sun = Color(red: 1.0, green: 0.68, blue: 0.12)
+    static let green = Color(red: 0.12, green: 0.64, blue: 0.42)
+    static let pink = Color(red: 0.88, green: 0.34, blue: 0.61)
+    static let stroke = Color(red: 0.91, green: 0.90, blue: 0.95)
 }

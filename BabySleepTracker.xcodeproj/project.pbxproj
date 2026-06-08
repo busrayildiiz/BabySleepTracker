@@ -37,6 +37,7 @@
 		FAEF106E2F53066D00E76FD4 /* AddBreakView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAEF106D2F53066D00E76FD4 /* AddBreakView.swift */; };
 		FAEF10702F530D3100E76FD4 /* SleepRecordRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAEF106F2F530D3100E76FD4 /* SleepRecordRow.swift */; };
 		FAEF10722F536DB200E76FD4 /* NapPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAEF10712F536DB200E76FD4 /* NapPickerView.swift */; };
+		FAEF20022FDE000100E76FD4 /* SleepCoachArchitecture.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAEF20012FDE000100E76FD4 /* SleepCoachArchitecture.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -82,6 +83,7 @@
 		FAEF106D2F53066D00E76FD4 /* AddBreakView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddBreakView.swift; sourceTree = "<group>"; };
 		FAEF106F2F530D3100E76FD4 /* SleepRecordRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepRecordRow.swift; sourceTree = "<group>"; };
 		FAEF10712F536DB200E76FD4 /* NapPickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NapPickerView.swift; sourceTree = "<group>"; };
+		FAEF20012FDE000100E76FD4 /* SleepCoachArchitecture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepCoachArchitecture.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -197,6 +199,7 @@
 		FAEF10612F4E26CE00E76FD4 /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				FAEF20012FDE000100E76FD4 /* SleepCoachArchitecture.swift */,
 				FA9DB0A62FD49EB9000B9211 /* AuthFlow.swift */,
 				FA5488CA2FAEB831002BC18B /* SleepAPI.swift */,
 				FAEF104C2F4E208000E76FD4 /* SleepStore.swift */,
@@ -323,6 +326,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				FAEF106A2F4E5D0100E76FD4 /* DayDetailViewModel.swift in Sources */,
+				FAEF20022FDE000100E76FD4 /* SleepCoachArchitecture.swift in Sources */,
 				FA9DB0A52FD49E91000B9211 /* LandingView.swift in Sources */,
 				FA9DB09D2FD44997000B9211 /* InsightView.swift in Sources */,
 				FAEF10502F4E208000E76FD4 /* BabySleepTracker.xcdatamodeld in Sources */,
