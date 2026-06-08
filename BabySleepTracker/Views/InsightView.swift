@@ -13,6 +13,7 @@ struct InsightsView: View {
 
     @State private var records: [SleepRecord] = []
     @State private var animateChart = false
+    @AppStorage("babyName") private var babyName: String = "Baby"
 
     private let calendar = Calendar.current
 
@@ -138,7 +139,7 @@ struct InsightsView: View {
                     Text("✨")
                 }
                 HStack(spacing: 4) {
-                    Text("Understand Umay's sleep better")
+                    Text("Understand \(babyName)'s sleep better")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                     Text("💜")
@@ -290,7 +291,7 @@ struct InsightsView: View {
                         .foregroundStyle(.orange)
                 }
 
-                Text("Umay tends to sleep longer between 11 AM and 1 PM.")
+                Text("\(babyName) tends to sleep longer between 11 AM and 1 PM.")
                     .font(.body)
                     .foregroundStyle(.primary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -499,7 +500,7 @@ struct InsightsView: View {
                 Text("Sleep Coach")
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.primary)
-                Text("Based on last 14 days, Umay seems ready for a nap around 12:15 PM.")
+                Text("Based on last 14 days, \(babyName) seems ready for a nap around 12:15 PM.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

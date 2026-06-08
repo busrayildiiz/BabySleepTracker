@@ -7,6 +7,7 @@ struct HistoryView: View {
     @State private var selectedDate: Date = Date()
     @State private var currentWeekOffset: Int = 0
     @State private var animateChart = false
+    @AppStorage("babyName") private var babyName: String = "Baby"
 
     private let calendar = Calendar.current
 
@@ -118,7 +119,7 @@ struct HistoryView: View {
 
     private var dayMessage: String {
         if selectedDayNetSleep == 0 { return "No sleep recorded for this day." }
-        if selectedDayNetSleep >= 60 * 2 { return "Great nap day! Umay was happy and rested well." }
+        if selectedDayNetSleep >= 60 * 2 { return "Great nap day! \(babyName) was happy and rested well." }
         return "Short sleep day. Consider adding more nap time."
     }
 
@@ -175,7 +176,7 @@ struct HistoryView: View {
                 Text("History")
                     .font(.largeTitle.weight(.bold))
                 HStack(spacing: 4) {
-                    Text("Umay's sleep journey")
+                    Text("\(babyName)'s sleep journey")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                     Text("✨")
@@ -616,7 +617,7 @@ struct HistoryView: View {
                 Text("Tip")
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.orange)
-                Text("Naps between 11 AM – 1 PM tend to be longer and more refreshing for Umay.")
+                Text("Naps between 11 AM – 1 PM tend to be longer and more refreshing for \(babyName).")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

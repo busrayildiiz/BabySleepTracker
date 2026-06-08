@@ -4,8 +4,8 @@ struct ContentView: View {
 
     @State private var selectedTab: Tab = .home
     @State private var showAddSheet = false
-    @State private var records: [SleepRecord] = []
 
+    private let tabAccent = Color(red: 0.40, green: 0.29, blue: 0.90)
 
     enum Tab {
         case home, history, insights, settings
@@ -46,8 +46,25 @@ struct ContentView: View {
             AddRecordView(
                 defaultDate: Date(),
                 vm: AddRecordViewModel(),
-                onSave: { _ in }
+                onSave: { newRecord in
+                    saveRecordFromTabBar(newRecord)
+                }
             )
+        }
+    }
+
+    private func saveRecordFromTabBar(_ newRecord: SleepRecord) {
+        var savedRecords: [SleepRecord] = []
+        if let data = UserDefaults.standard.data(forKey: "sleepRecords"),
+           let decoded = try? JSONDecoder().decode([SleepRecord].self, from: data) {
+            savedRecords = decoded
+        }
+
+        savedRecords.append(newRecord)
+
+        if let encoded = try? JSONEncoder().encode(savedRecords) {
+            UserDefaults.standard.set(encoded, forKey: "sleepRecords")
+            NotificationCenter.default.post(name: .sleepRecordsDidChange, object: nil)
         }
     }
 
@@ -64,26 +81,33 @@ struct ContentView: View {
             } label: {
                 ZStack {
                     Circle()
-                        .fill(Color.orange.opacity(0.22))
-                        .frame(width: 56, height: 56)
+                        .fill(
+                            LinearGradient(
+                                colors: [Color(red: 0.52, green: 0.42, blue: 0.98), tabAccent],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 64, height: 64)
+                        .shadow(color: tabAccent.opacity(0.30), radius: 14, x: 0, y: 8)
                     Image(systemName: "plus")
-                        .font(.system(size: 22, weight: .semibold))
-                        .foregroundStyle(Color.orange)
+                        .font(.system(size: 30, weight: .regular))
+                        .foregroundStyle(.white)
                 }
             }
             .frame(maxWidth: .infinity)
-            .offset(y: -8)
+            .offset(y: -14)
 
-            tabItem(icon: "chart.line.uptrend.xyaxis", label: "Insights", tab: .insights)
+            tabItem(icon: "brain.head.profile", label: "AI Coach", tab: .insights)
             tabItem(icon: "gearshape", label: "Settings", tab: .settings)
         }
         .padding(.horizontal, 16)
         .padding(.top, 8)
-        .padding(.bottom, 16)
+        .padding(.bottom, 18)
         .background(
             RoundedRectangle(cornerRadius: 28, style: .continuous)
                 .fill(Color(.systemBackground))
-                .shadow(color: .black.opacity(0.10), radius: 16, x: 0, y: -2)
+                .shadow(color: .black.opacity(0.08), radius: 16, x: 0, y: -2)
                 .ignoresSafeArea(edges: .bottom)
         )
     }
@@ -98,10 +122,10 @@ struct ContentView: View {
             VStack(spacing: 4) {
                 Image(systemName: isSelected ? filledIcon(icon) : icon)
                     .font(.system(size: 20, weight: isSelected ? .semibold : .regular))
-                    .foregroundStyle(isSelected ? Color.orange : Color(uiColor: .secondaryLabel))
+                    .foregroundStyle(isSelected ? tabAccent : Color(uiColor: .secondaryLabel))
                 Text(label)
                     .font(.system(size: 10, weight: isSelected ? .semibold : .regular))
-                    .foregroundStyle(isSelected ? Color.orange : Color(uiColor: .secondaryLabel))
+                    .foregroundStyle(isSelected ? tabAccent : Color(uiColor: .secondaryLabel))
             }
             .frame(maxWidth: .infinity)
         }

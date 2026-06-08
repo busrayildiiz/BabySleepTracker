@@ -17,6 +17,7 @@ struct SettingsView: View {
     @State private var smartSuggestionsOn = true
     @State private var selectedPhoto: PhotosPickerItem? = nil
     @State private var avatarImage: UIImage? = nil
+    @AppStorage("babyName") private var babyName: String = "Baby"
 
     private func loadRecords() {
         if let data = UserDefaults.standard.data(forKey: "sleepRecords"),
@@ -169,7 +170,7 @@ struct SettingsView: View {
             }
 
             VStack(alignment: .leading, spacing: 4) {
-                Text("Umay & You")
+                Text("\(babyName) & You")
                     .font(.headline.weight(.bold))
                 HStack(spacing: 4) {
                     Text("Keep tracking, keep growing")
@@ -222,7 +223,7 @@ struct SettingsView: View {
                 let pct = abs(weekVsLastWeek)
                 let direction = weekVsLastWeek >= 0 ? "longer" : "shorter"
                 Text(pct > 0
-                     ? "Umay slept \(pct)% \(direction) this week than last week."
+                     ? "\(babyName) slept \(pct)% \(direction) this week than last week."
                      : "Keep tracking to see weekly insights.")
                     .font(.subheadline)
                     .foregroundStyle(.primary)
@@ -237,7 +238,7 @@ struct SettingsView: View {
 
     private var atAGlanceCard: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Umay at a Glance")
+            Text("\(babyName) at a Glance")
                 .font(.headline.weight(.semibold))
                 .padding(.horizontal, 14)
                 .padding(.top, 14)
@@ -318,7 +319,7 @@ struct SettingsView: View {
         settingsSection(title: "BABY PROFILE") {
             settingsRowChevron(
                 icon: "face.smiling", iconColor: .indigo,
-                title: "Umay's Profile",
+                title: "\(babyName)'s Profile",
                 subtitle: "Age, sleep needs, and more"
             )
             Divider().padding(.leading, 52)
