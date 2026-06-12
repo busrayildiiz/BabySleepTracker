@@ -301,4 +301,3 @@ final class DefaultPatternAgent: PatternAgentProtocol {
         return values.reduce(0, +) / values.count
     }
 }
-Yapıştırdıktan sonra Cmd+B yap ve kalan 4 hatayı buraya yapıştır — büyük ihtimalle InsightAgent.swift veya SleepCoachArchitecture.swift'ten geliyor, birlikte bakalım.Sonnet 4.6 Medium

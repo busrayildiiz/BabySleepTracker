@@ -135,10 +135,8 @@
 		FA91C5EA2FDB476C0089E1EE /* Agents */ = {
 			isa = PBXGroup;
 			children = (
-				FAAD82CD2FDBCDF100F0FBC6 /* PhaseAgent.swift */,
-				FAD9C3712FDBD0CA00A7D9B7 /* PatternAgent.swift */,
-				FA91C5E52FDB47020089E1EE /* PredictAgent.swift */,
-				FA91C5E72FDB472E0089E1EE /* InsightAgent.swift */,
+				FAD9C3762FDC386C00A7D9B7 /* Implements */,
+				FAD9C3752FDC385300A7D9B7 /* Protocols */,
 			);
 			path = Agents;
 			sourceTree = "<group>";
@@ -160,11 +158,29 @@
 			path = Guidelines;
 			sourceTree = "<group>";
 		};
-		FAEF10372F4E207F00E76FD4 = {
+		FAD9C3752FDC385300A7D9B7 /* Protocols */ = {
 			isa = PBXGroup;
 			children = (
 				FAD9C3732FDBD14100A7D9B7 /* PatternAgentProtocol.swift */,
 				FAAD82CF2FDBCE3C00F0FBC6 /* PhaseAgentProtocol.swift */,
+			);
+			path = Protocols;
+			sourceTree = "<group>";
+		};
+		FAD9C3762FDC386C00A7D9B7 /* Implements */ = {
+			isa = PBXGroup;
+			children = (
+				FA91C5E72FDB472E0089E1EE /* InsightAgent.swift */,
+				FA91C5E52FDB47020089E1EE /* PredictAgent.swift */,
+				FAD9C3712FDBD0CA00A7D9B7 /* PatternAgent.swift */,
+				FAAD82CD2FDBCDF100F0FBC6 /* PhaseAgent.swift */,
+			);
+			path = Implements;
+			sourceTree = "<group>";
+		};
+		FAEF10372F4E207F00E76FD4 = {
+			isa = PBXGroup;
+			children = (
 				FAEF10422F4E207F00E76FD4 /* BabySleepTracker */,
 				FA5488D12FAEB964002BC18B /* BabySleepTrackerTests */,
 				FAEF10412F4E207F00E76FD4 /* Products */,

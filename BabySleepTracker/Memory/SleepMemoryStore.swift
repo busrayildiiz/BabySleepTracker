@@ -125,21 +125,6 @@ final class SleepMemoryStore {
         defaults.set(level, forKey: Keys.overtiredLevel.rawValue)
     }
     
-    // MARK: - Night Prediction
-    
-    func loadNightPrediction() -> NightPrediction? {
-        guard let data = defaults.data(forKey: Keys.nightPrediction.rawValue),
-              let prediction = try? JSONDecoder().decode(NightPrediction.self, from: data) else {
-            return nil
-        }
-        return prediction
-    }
-    
-    func saveNightPrediction(_ prediction: NightPrediction) {
-        if let data = try? JSONEncoder().encode(prediction) {
-            defaults.set(data, forKey: Keys.nightPrediction.rawValue)
-        }
-    }
     
     // MARK: - Current Phase
     
@@ -158,10 +143,3 @@ final class SleepMemoryStore {
     }
 }
 
-// MARK: - NightPrediction Model
-struct NightPrediction: Codable {
-    let predictedBedtime: Date
-    let expectedDuration: TimeInterval
-    let confidence: Double
-    let recommendedWakeup: Date
-}
