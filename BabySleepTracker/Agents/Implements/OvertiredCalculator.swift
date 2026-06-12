@@ -219,11 +219,3 @@ enum DailySleepStatus {
         }
     }
 }
-
-// MARK: - Date Extension
-
-private extension Date {
-    func addingMinutes(_ minutes: Int) -> Date {
-        Calendar.current.date(byAdding: .minute, value: minutes, to: self) ?? self
-    }
-}
