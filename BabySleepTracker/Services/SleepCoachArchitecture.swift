@@ -85,43 +85,6 @@ protocol WakeWindowBaselineProviding {
     func wakeWindow(forAgeMonths ageMonths: Int) -> ClosedRange<Int>
 }
 
-struct AAPSleepGuidelineAgent: PediatricSleepGuidelineProviding {
-    func guideline(forAgeMonths ageMonths: Int) -> SleepGuideline {
-        let range: ClosedRange<Int>
-        switch ageMonths {
-        case ..<4:
-            range = 0...0
-        case 4...11:
-            range = 12 * 60...16 * 60
-        case 12...35:
-            range = 11 * 60...14 * 60
-        default:
-            range = 10 * 60...13 * 60
-        }
-
-        return SleepGuideline(
-            minimumDailyMinutes: range.lowerBound,
-            maximumDailyMinutes: range.upperBound,
-            sourceName: "AAP-endorsed AASM sleep duration guidance",
-            sourceURL: "https://aasm.org/recharge-with-sleep-pediatric-sleep-recommendations-promoting-optimal-health/"
-        )
-    }
-}
-
-struct VersionedWakeWindowBaselineAgent: WakeWindowBaselineProviding {
-    func wakeWindow(forAgeMonths ageMonths: Int) -> ClosedRange<Int> {
-        switch ageMonths {
-        case ..<4: return 60...120
-        case 4...5: return 90...150
-        case 6...8: return 120...180
-        case 9...11: return 150...210
-        case 12...14: return 180...240
-        case 15...18: return 240...300
-        case 19...24: return 300...360
-        default: return 300...390
-        }
-    }
-}
 
 final class SleepCoachService {
     static let shared = SleepCoachService()
@@ -135,7 +98,7 @@ final class SleepCoachService {
         defaults: UserDefaults = .standard,
         calendar: Calendar = .current,
         guidelineAgent: PediatricSleepGuidelineProviding = AAPSleepGuidelineAgent(),
-        baselineAgent: WakeWindowBaselineProviding = VersionedWakeWindowBaselineAgent()
+        baselineAgent: WakeWindowBaselineProviding = WakeWindowBaselineAgent()
     ) {
         self.defaults = defaults
         self.calendar = calendar
