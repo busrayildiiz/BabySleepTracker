@@ -1,0 +1,257 @@
+//
+//  SleepCoachOrchestrator.swift
+//  BabySleepTracker
+//
+//  Created by MacBook on 13.06.2026.
+//
+
+import Foundation
+
+struct OrchestratedSnapshot {
+    let generatedAt:       Date
+    let babyName:          String
+    let ageMonths:         Int
+
+    // Ajanlardan gelen çıktılar
+    let phase:             CoachPhase
+    let readiness:         PhaseReadinessReport
+    let pattern:           BabyPattern?
+    let daytime:           DaytimePrediction
+    let night:             NightPrediction
+    let transition:        NapTransitionAssessment
+    let insights:          SleepInsightBundle
+
+    // Günlük uyku durumu
+    let todayTotalMinutes: Int
+    let sleepStatus:       DailySleepStatus
+}
+
+// MARK: - SleepCoachOrchestrator
+
+@MainActor
+final class SleepCoachOrchestrator: ObservableObject {
+
+    // MARK: - Published State
+
+    @Published private(set) var snapshot: OrchestratedSnapshot?
+    @Published private(set) var isLoading = false
+
+    // MARK: - Agents
+
+    private let phaseAgent:      PhaseAgentProtocol
+    private let patternAgent:    PatternAgentProtocol
+    private let daytimeAgent:    DaytimePredictionAgentProtocol
+    private let nightAgent:      NightPredictionAgentProtocol
+    private let transitionAgent: NapTransitionAgentProtocol
+    private let insightAgent:    InsightAgentProtocol
+    private let overtiredCalc:   OvertiredCalculator
+    private let profileProvider: AgeBasedSleepProfileProviding
+    
+    // MARK: - Singleton
+
+       static let shared = SleepCoachOrchestrator()
+
+       // MARK: - Init
+
+       init(
+           phaseAgent:      PhaseAgentProtocol      = DefaultPhaseAgent(),
+           patternAgent:    PatternAgentProtocol     = DefaultPatternAgent(),
+           daytimeAgent:    DaytimePredictionAgentProtocol = DefaultDaytimePredictionAgent(),
+           nightAgent:      NightPredictionAgentProtocol   = DefaultNightPredictionAgent(),
+           transitionAgent: NapTransitionAgentProtocol     = DefaultNapTransitionAgent(),
+           insightAgent:    InsightAgentProtocol     = DefaultInsightAgent(),
+           overtiredCalc:   OvertiredCalculator      = OvertiredCalculator(),
+           profileProvider: AgeBasedSleepProfileProviding  = DefaultAgeBasedSleepProfileProvider()
+       ) {
+           self.phaseAgent      = phaseAgent
+           self.patternAgent    = patternAgent
+           self.daytimeAgent    = daytimeAgent
+           self.nightAgent      = nightAgent
+           self.transitionAgent = transitionAgent
+           self.insightAgent    = insightAgent
+           self.overtiredCalc   = overtiredCalc
+           self.profileProvider = profileProvider
+       }
+
+       // MARK: - Generate Snapshot
+
+       func generate(now: Date = Date()) {
+           isLoading = true
+           defer { isLoading = false }
+
+           // 1. Veriyi yükle
+           let records     = loadRecords()
+           let wakeRecords = loadWakeRecords()
+           let babyName    = loadBabyName()
+           let ageMonths   = loadAgeMonths(at: now)
+           
+           // 2. Temel metrikler
+                 let breaks    = records.filter { $0.kind == .break }
+                 let dayNaps   = records.filter { $0.kind == .dayNap }
+                 let todayRecs = records.filter { Calendar.current.isDateInToday($0.date) }
+
+                 let trackedDays = countTrackedDays(
+                     records:     records,
+                     wakeRecords: wakeRecords
+                 )
+
+                 let todayTotal = todayRecs
+                     .filter { $0.kind != .break }
+                     .reduce(0) { $0 + $1.totalMinutes(breaks: breaks) }
+
+                 // 3. Phase
+                 let phase    = phaseAgent.currentPhase(
+                     ageMonths:   ageMonths,
+                     trackedDays: trackedDays
+                 )
+
+                 // Wake time ve gece uykusu sinyalleri
+                 let hasTodayWake = wakeRecords.contains {
+                     Calendar.current.isDateInToday($0.day)
+                 }
+                 let hasYesterdayNight: Bool = {
+                     guard let yesterday = Calendar.current.date(
+                         byAdding: .day, value: -1, to: now
+                     ) else { return false }
+                     return records.contains {
+                         $0.kind == .nightSleep &&
+                         Calendar.current.isDate($0.date, inSameDayAs: yesterday)
+                     }
+                 }()
+                let readiness = phaseAgent.readinessReport(
+                    ageMonths:            ageMonths,
+                    trackedDays:          trackedDays,
+                    hasTodayWakeTime:     hasTodayWake,
+                    hasYesterdayNightSleep: hasYesterdayNight
+                )
+
+                // 4. Pattern — tooYoung değilse analiz et
+                let pattern: BabyPattern?
+                if case .tooYoung = phase {
+                    pattern = nil
+                } else {
+                    pattern = patternAgent.analyze(
+                        records:     records,
+                        wakeRecords: wakeRecords,
+                        ageMonths:   ageMonths,
+                        now:         now
+                    )
+                }
+
+                // 5. Daytime prediction
+                let daytime = daytimeAgent.predictNextNap(
+                    pattern:      pattern,
+                    todayRecords: todayRecs,
+                    wakeRecords:  wakeRecords,
+                    ageMonths:    ageMonths,
+                    trackedDays:  trackedDays,
+                    now:          now
+                )
+
+                // 6. Night prediction
+                let night = nightAgent.predictBedtime(
+                    pattern:      pattern,
+                    todayRecords: todayRecs,
+                    wakeRecords:  wakeRecords,
+                    ageMonths:    ageMonths,
+                    trackedDays:  trackedDays,
+                    now:          now
+                )
+
+                // 7. Nap transition
+                let transition = transitionAgent.assess(
+                    records:     records,
+                    wakeRecords: wakeRecords,
+                    ageMonths:   ageMonths,
+                    now:         now
+                )
+
+                // 8. Insights
+                let insights = insightAgent.buildInsights(
+                    phase:       phase,
+                    pattern:     pattern,
+                    trackedDays: trackedDays,
+                    babyName:    babyName
+                )
+
+                // 9. Sleep status
+                let sleepStatus = overtiredCalc.dailySleepStatus(
+                    totalMinutes: todayTotal,
+                    ageMonths:    ageMonths
+                )
+
+                // 10. Snapshot oluştur
+                let result = OrchestratedSnapshot(
+                    generatedAt:       now,
+                    babyName:          babyName,
+                    ageMonths:         ageMonths,
+                    phase:             phase,
+                    readiness:         readiness,
+                    pattern:           pattern,
+                    daytime:           daytime,
+                    night:             night,
+                    transition:        transition,
+                    insights:          insights,
+                    todayTotalMinutes: todayTotal,
+                    sleepStatus:       sleepStatus
+                )
+
+                snapshot = result
+                cache(result)
+            }
+
+            // MARK: - Data Loaders
+
+            private func loadRecords() -> [SleepRecord] {
+                guard let data = UserDefaults.standard.data(forKey: "sleepRecords"),
+                      let decoded = try? JSONDecoder().decode([SleepRecord].self, from: data)
+                else { return [] }
+                return decoded
+            }
+
+            private func loadWakeRecords() -> [DailyWakeRecord] {
+                guard let data = UserDefaults.standard.data(forKey: "dailyWakeRecords_v1"),
+                      let decoded = try? JSONDecoder().decode([DailyWakeRecord].self, from: data)
+                else { return [] }
+                return decoded
+            }
+
+            private func loadBabyName() -> String {
+                let name = UserDefaults.standard.string(forKey: "babyName")?
+                    .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                return name.isEmpty ? "Baby" : name
+            }
+
+            private func loadAgeMonths(at date: Date) -> Int {
+                let birthDate: Date?
+                if let saved = UserDefaults.standard.object(forKey: "babyBirthDate") as? Date {
+                    birthDate = saved
+                } else if let seconds = UserDefaults.standard.object(forKey: "babyBirthDate") as? Double {
+                    birthDate = Date(timeIntervalSince1970: seconds)
+                } else {
+                    birthDate = nil
+                }
+                guard let birth = birthDate else { return 9 }
+                return max(0, Calendar.current.dateComponents([.month], from: birth, to: date).month ?? 9)
+            }
+
+            private func countTrackedDays(
+                records:     [SleepRecord],
+                wakeRecords: [DailyWakeRecord]
+            ) -> Int {
+                let sleepDays = records.map { Calendar.current.startOfDay(for: $0.date) }
+                let wakeDays  = wakeRecords.map { Calendar.current.startOfDay(for: $0.day) }
+                return Set(sleepDays + wakeDays).count
+            }
+
+            // MARK: - Cache
+
+            private func cache(_ snapshot: OrchestratedSnapshot) {
+                // Sadece basit değerleri cache'le — Date'ler UserDefaults'a direkt gider
+                UserDefaults.standard.set(
+                    snapshot.generatedAt.timeIntervalSince1970,
+                    forKey: "orchestrator_lastGenerated"
+                )
+            }
+        }
+
