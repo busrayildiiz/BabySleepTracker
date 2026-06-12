@@ -11,6 +11,7 @@
 		FA5488D32FAEB964002BC18B /* BabySleepTrackerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA5488D22FAEB964002BC18B /* BabySleepTrackerTests.swift */; };
 		FA5488DA2FAEB98D002BC18B /* AddRecorViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA5488D92FAEB98D002BC18B /* AddRecorViewModelTests.swift */; };
 		FA5488DC2FAEBBD4002BC18B /* SleepAPITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA5488DB2FAEBBD4002BC18B /* SleepAPITests.swift */; };
+		FA7232D92FDCC73400647487 /* AgeBasedSleepProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA7232D82FDCC73400647487 /* AgeBasedSleepProfile.swift */; };
 		FA91C5E02FDB46270089E1EE /* SleepMemoryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA91C5DF2FDB46270089E1EE /* SleepMemoryStore.swift */; };
 		FA91C5E62FDB47020089E1EE /* PredictAgent.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA91C5E52FDB47020089E1EE /* PredictAgent.swift */; };
 		FA91C5E82FDB472E0089E1EE /* InsightAgent.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA91C5E72FDB472E0089E1EE /* InsightAgent.swift */; };
@@ -65,6 +66,7 @@
 		FA5488D22FAEB964002BC18B /* BabySleepTrackerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BabySleepTrackerTests.swift; sourceTree = "<group>"; };
 		FA5488D92FAEB98D002BC18B /* AddRecorViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddRecorViewModelTests.swift; sourceTree = "<group>"; };
 		FA5488DB2FAEBBD4002BC18B /* SleepAPITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepAPITests.swift; sourceTree = "<group>"; };
+		FA7232D82FDCC73400647487 /* AgeBasedSleepProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgeBasedSleepProfile.swift; sourceTree = "<group>"; };
 		FA91C5DF2FDB46270089E1EE /* SleepMemoryStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepMemoryStore.swift; sourceTree = "<group>"; };
 		FA91C5E52FDB47020089E1EE /* PredictAgent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PredictAgent.swift; sourceTree = "<group>"; };
 		FA91C5E72FDB472E0089E1EE /* InsightAgent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InsightAgent.swift; sourceTree = "<group>"; };
@@ -181,6 +183,7 @@
 		FAEF10372F4E207F00E76FD4 = {
 			isa = PBXGroup;
 			children = (
+				FA7232D82FDCC73400647487 /* AgeBasedSleepProfile.swift */,
 				FAEF10422F4E207F00E76FD4 /* BabySleepTracker */,
 				FA5488D12FAEB964002BC18B /* BabySleepTrackerTests */,
 				FAEF10412F4E207F00E76FD4 /* Products */,
@@ -403,6 +406,7 @@
 				FA5488CB2FAEB831002BC18B /* SleepAPI.swift in Sources */,
 				FAEF105B2F4E210600E76FD4 /* SleepRecord.swift in Sources */,
 				FAEF10592F4E20D600E76FD4 /* AddRecordView.swift in Sources */,
+				FA7232D92FDCC73400647487 /* AgeBasedSleepProfile.swift in Sources */,
 				FAEF105D2F4E212F00E76FD4 /* TimeFormat.swift in Sources */,
 				FA9DB0A32FD49E6B000B9211 /* LoginView.swift in Sources */,
 				FAEF106C2F4FA0C800E76FD4 /* SegmentKind.swift in Sources */,
