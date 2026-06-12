@@ -12,7 +12,6 @@
 		FA5488DA2FAEB98D002BC18B /* AddRecorViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA5488D92FAEB98D002BC18B /* AddRecorViewModelTests.swift */; };
 		FA5488DC2FAEBBD4002BC18B /* SleepAPITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA5488DB2FAEBBD4002BC18B /* SleepAPITests.swift */; };
 		FA91C5E02FDB46270089E1EE /* SleepMemoryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA91C5DF2FDB46270089E1EE /* SleepMemoryStore.swift */; };
-		FA91C5E22FDB46CC0089E1EE /* PhaseAgent.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA91C5E12FDB46CC0089E1EE /* PhaseAgent.swift */; };
 		FA91C5E42FDB46E90089E1EE /* PatternAgent.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA91C5E32FDB46E90089E1EE /* PatternAgent.swift */; };
 		FA91C5E62FDB47020089E1EE /* PredictAgent.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA91C5E52FDB47020089E1EE /* PredictAgent.swift */; };
 		FA91C5E82FDB472E0089E1EE /* InsightAgent.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA91C5E72FDB472E0089E1EE /* InsightAgent.swift */; };
@@ -26,6 +25,8 @@
 		FA9DB0A52FD49E91000B9211 /* LandingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA9DB0A42FD49E91000B9211 /* LandingView.swift */; };
 		FA9DB0A72FD49EB9000B9211 /* AuthFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA9DB0A62FD49EB9000B9211 /* AuthFlow.swift */; };
 		FA9DB0A92FD49ED4000B9211 /* CreateAccountView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA9DB0A82FD49ED4000B9211 /* CreateAccountView.swift */; };
+		FAAD82CE2FDBCDF100F0FBC6 /* PhaseAgent.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAAD82CD2FDBCDF100F0FBC6 /* PhaseAgent.swift */; };
+		FAAD82D02FDBCE3C00F0FBC6 /* PhaseAgentProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAAD82CF2FDBCE3C00F0FBC6 /* PhaseAgentProtocol.swift */; };
 		FAEF10442F4E207F00E76FD4 /* BabySleepTrackerApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAEF10432F4E207F00E76FD4 /* BabySleepTrackerApp.swift */; };
 		FAEF10462F4E207F00E76FD4 /* SleepListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAEF10452F4E207F00E76FD4 /* SleepListView.swift */; };
 		FAEF10482F4E208000E76FD4 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = FAEF10472F4E208000E76FD4 /* Assets.xcassets */; };
@@ -64,7 +65,6 @@
 		FA5488D92FAEB98D002BC18B /* AddRecorViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddRecorViewModelTests.swift; sourceTree = "<group>"; };
 		FA5488DB2FAEBBD4002BC18B /* SleepAPITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepAPITests.swift; sourceTree = "<group>"; };
 		FA91C5DF2FDB46270089E1EE /* SleepMemoryStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepMemoryStore.swift; sourceTree = "<group>"; };
-		FA91C5E12FDB46CC0089E1EE /* PhaseAgent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhaseAgent.swift; sourceTree = "<group>"; };
 		FA91C5E32FDB46E90089E1EE /* PatternAgent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PatternAgent.swift; sourceTree = "<group>"; };
 		FA91C5E52FDB47020089E1EE /* PredictAgent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PredictAgent.swift; sourceTree = "<group>"; };
 		FA91C5E72FDB472E0089E1EE /* InsightAgent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InsightAgent.swift; sourceTree = "<group>"; };
@@ -78,6 +78,8 @@
 		FA9DB0A42FD49E91000B9211 /* LandingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LandingView.swift; sourceTree = "<group>"; };
 		FA9DB0A62FD49EB9000B9211 /* AuthFlow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthFlow.swift; sourceTree = "<group>"; };
 		FA9DB0A82FD49ED4000B9211 /* CreateAccountView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreateAccountView.swift; sourceTree = "<group>"; };
+		FAAD82CD2FDBCDF100F0FBC6 /* PhaseAgent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhaseAgent.swift; sourceTree = "<group>"; };
+		FAAD82CF2FDBCE3C00F0FBC6 /* PhaseAgentProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhaseAgentProtocol.swift; sourceTree = "<group>"; };
 		FAEF10402F4E207F00E76FD4 /* BabySleepTracker.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BabySleepTracker.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		FAEF10432F4E207F00E76FD4 /* BabySleepTrackerApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BabySleepTrackerApp.swift; sourceTree = "<group>"; };
 		FAEF10452F4E207F00E76FD4 /* SleepListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepListView.swift; sourceTree = "<group>"; };
@@ -131,7 +133,7 @@
 		FA91C5EA2FDB476C0089E1EE /* Agents */ = {
 			isa = PBXGroup;
 			children = (
-				FA91C5E12FDB46CC0089E1EE /* PhaseAgent.swift */,
+				FAAD82CD2FDBCDF100F0FBC6 /* PhaseAgent.swift */,
 				FA91C5E32FDB46E90089E1EE /* PatternAgent.swift */,
 				FA91C5E52FDB47020089E1EE /* PredictAgent.swift */,
 				FA91C5E72FDB472E0089E1EE /* InsightAgent.swift */,
@@ -159,6 +161,7 @@
 		FAEF10372F4E207F00E76FD4 = {
 			isa = PBXGroup;
 			children = (
+				FAAD82CF2FDBCE3C00F0FBC6 /* PhaseAgentProtocol.swift */,
 				FAEF10422F4E207F00E76FD4 /* BabySleepTracker */,
 				FA5488D12FAEB964002BC18B /* BabySleepTrackerTests */,
 				FAEF10412F4E207F00E76FD4 /* Products */,
@@ -384,8 +387,8 @@
 				FAEF10592F4E20D600E76FD4 /* AddRecordView.swift in Sources */,
 				FAEF105D2F4E212F00E76FD4 /* TimeFormat.swift in Sources */,
 				FA9DB0A32FD49E6B000B9211 /* LoginView.swift in Sources */,
-				FA91C5E22FDB46CC0089E1EE /* PhaseAgent.swift in Sources */,
 				FAEF106C2F4FA0C800E76FD4 /* SegmentKind.swift in Sources */,
+				FAAD82D02FDBCE3C00F0FBC6 /* PhaseAgentProtocol.swift in Sources */,
 				FA9DB0A72FD49EB9000B9211 /* AuthFlow.swift in Sources */,
 				FAEF10722F536DB200E76FD4 /* NapPickerView.swift in Sources */,
 				FAEF106E2F53066D00E76FD4 /* AddBreakView.swift in Sources */,
@@ -403,6 +406,7 @@
 				FA91C5E62FDB47020089E1EE /* PredictAgent.swift in Sources */,
 				FA91C5E02FDB46270089E1EE /* SleepMemoryStore.swift in Sources */,
 				FAEF10442F4E207F00E76FD4 /* BabySleepTrackerApp.swift in Sources */,
+				FAAD82CE2FDBCDF100F0FBC6 /* PhaseAgent.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
