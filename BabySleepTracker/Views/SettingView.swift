@@ -17,15 +17,17 @@ struct SettingsView: View {
     @State private var smartSuggestionsOn = true
     @State private var selectedPhoto: PhotosPickerItem? = nil
     @State private var avatarImage: UIImage? = nil
+    @State private var showAppearanceSheet = false
     @AppStorage("babyName") private var babyName: String = "Baby"
+    @AppStorage("appAppearance") private var appAppearance: String = "system"
 
     private func loadRecords() {
         if let data = UserDefaults.standard.data(forKey: "sleepRecords"),
            let decoded = try? JSONDecoder().decode([SleepRecord].self, from: data) {
             records = decoded
+        }
         if let data = UserDefaults.standard.data(forKey: "avatarImageData") {
             avatarImage = UIImage(data: data)
-            }
         }
     }
 
@@ -80,6 +82,14 @@ struct SettingsView: View {
         return Int(Double(t - l) / Double(l) * 100)
     }
 
+    private var appearanceLabel: String {
+        switch appAppearance {
+        case "light": return "Light"
+        case "dark":  return "Dark"
+        default:      return "System"
+        }
+    }
+
     // MARK: - Body
 
     var body: some View {
@@ -102,6 +112,15 @@ struct SettingsView: View {
             .background(Color(.systemGroupedBackground))
             .navigationBarHidden(true)
             .onAppear { loadRecords() }
+            .onReceive(NotificationCenter.default.publisher(for: .sleepRecordsDidChange)) { _ in
+                loadRecords()
+            }
+        }
+        .confirmationDialog("Appearance", isPresented: $showAppearanceSheet, titleVisibility: .visible) {
+            Button("System") { appAppearance = "system" }
+            Button("Light")  { appAppearance = "light" }
+            Button("Dark")   { appAppearance = "dark" }
+            Button("Cancel", role: .cancel) { }
         }
     }
 
@@ -132,7 +151,7 @@ struct SettingsView: View {
                     Circle()
                         .fill(Color.orange.opacity(0.15))
                         .frame(width: 64, height: 64)
-                    
+
                     if let img = avatarImage {
                         Image(uiImage: img)
                             .resizable()
@@ -144,7 +163,7 @@ struct SettingsView: View {
                             .font(.system(size: 36))
                     }
                 }
-                
+
                 PhotosPicker(selection: $selectedPhoto,
                              matching: .images,
                              photoLibrary: .shared()) {
@@ -163,7 +182,6 @@ struct SettingsView: View {
                     if let data = try? await newItem?.loadTransferable(type: Data.self),
                        let image = UIImage(data: data) {
                         avatarImage = image
-                        // UserDefaults'a kaydet
                         UserDefaults.standard.set(data, forKey: "avatarImageData")
                     }
                 }
@@ -345,8 +363,14 @@ struct SettingsView: View {
                     .padding(.top, 14)
                     .padding(.bottom, 8)
 
-                compactRow(icon: "heart", iconColor: .indigo,
-                           title: "Appearance", subtitle: "Light mode")
+                Button {
+                    showAppearanceSheet = true
+                } label: {
+                    compactRow(icon: "circle.lefthalf.filled", iconColor: .indigo,
+                               title: "Appearance", subtitle: appearanceLabel)
+                }
+                .buttonStyle(.plain)
+
                 Divider().padding(.leading, 14)
                 compactRow(icon: "globe", iconColor: .indigo,
                            title: "Language", subtitle: "English")

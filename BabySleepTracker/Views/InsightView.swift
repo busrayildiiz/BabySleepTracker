@@ -91,8 +91,9 @@ struct InsightsView: View {
                            .frame(maxWidth: .infinity)
                            .padding(.vertical, 9)
                            .background(
-                               RoundedRectangle(cornerRadius: 9, style: .continuous)
-                                   .fill(selectedTab == tab ? CoachColor.purple : Color.clear)
+                               RoundedRectangle(cornerRadius: 11, style: .continuous)
+                                   .fill(Color(.systemBackground))   // ← Color.white yerine
+                                   .shadow(color: CoachColor.ink.opacity(0.04), radius: 10, y: 4)
                            )
                    }
                    .buttonStyle(.plain)
@@ -724,7 +725,7 @@ struct InsightsView: View {
 
         private var cardBackground: some View {
             RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(Color.white)
+                .fill(Color(.systemBackground))
                 .shadow(color: CoachColor.ink.opacity(0.035), radius: 12, y: 6)
         }
 
@@ -796,15 +797,16 @@ struct InsightsView: View {
 
     // MARK: - Colors
 
-    private enum CoachColor {
-        static let background = Color(red: 0.985, green: 0.98,  blue: 1.0)
-        static let ink        = Color(red: 0.035, green: 0.04,  blue: 0.22)
-        static let muted      = Color(red: 0.38,  green: 0.39,  blue: 0.52)
-        static let purple     = Color(red: 0.55,  green: 0.45,  blue: 0.96)
-        static let purpleDeep = Color(red: 0.38,  green: 0.27,  blue: 0.88)
-        static let sun        = Color(red: 1.0,   green: 0.68,  blue: 0.12)
-        static let green      = Color(red: 0.12,  green: 0.64,  blue: 0.42)
-        static let pink       = Color(red: 0.88,  green: 0.34,  blue: 0.61)
-        static let stroke     = Color(red: 0.91,  green: 0.90,  blue: 0.95)
-    }
+
+private enum CoachColor {
+    static let background = Color(.systemGroupedBackground)
+    static let ink        = Color(.label)
+    static let muted      = Color(.secondaryLabel)
+    static let purple     = Color(red: 0.55,  green: 0.45,  blue: 0.96)
+    static let purpleDeep = Color(red: 0.45,  green: 0.35,  blue: 0.92)
+    static let sun        = Color(red: 1.0,   green: 0.68,  blue: 0.12)
+    static let green      = Color(red: 0.16,  green: 0.68,  blue: 0.46)
+    static let pink       = Color(red: 0.88,  green: 0.34,  blue: 0.61)
+    static let stroke     = Color(.separator)
+}
 
