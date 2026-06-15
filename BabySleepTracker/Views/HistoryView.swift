@@ -17,6 +17,7 @@ struct HistoryView: View {
             records = decoded
         }
     }
+        
 
     // MARK: - Week days
 
@@ -165,6 +166,9 @@ struct HistoryView: View {
             .background(Color(.systemGroupedBackground))
             .navigationBarHidden(true)
             .onAppear { loadRecords() }
+            .onReceive(NotificationCenter.default.publisher(for: .sleepRecordsDidChange)) { _ in
+                loadRecords()
+            }
         }
     }
 

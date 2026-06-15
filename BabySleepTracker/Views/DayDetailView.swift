@@ -145,11 +145,11 @@ struct NapDetailCard: View {
     @State private var breaksExpanded = true
 
     private var isNight: Bool { nap.kind == .nightSleep }
-    
+
     private var napTint: Color {
         nap.isOngoing ? .indigo : (isNight ? .indigo : .orange)
     }
-    
+
     private var netMinutes: Int { nap.totalMinutes(breaks: allBreaks) }
     private var napEnd: Date {
         nap.date.addingTimeInterval(TimeInterval(nap.effectiveDuration * 60))
@@ -178,12 +178,23 @@ struct NapDetailCard: View {
                 Spacer()
 
                 VStack(alignment: .trailing, spacing: 2) {
-                    Text(TimeFormat.minutes(nap.duration))
-                        .font(.subheadline.weight(.bold))
-                        .foregroundStyle(.primary)
-                    Text("Total Sleep Time")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
+                    if nap.isOngoing {
+                        TimelineView(.periodic(from: .now, by: 60)) { _ in
+                            Text(TimeFormat.minutes(nap.effectiveDuration))
+                                .font(.subheadline.weight(.bold))
+                                .foregroundStyle(.indigo)
+                        }
+                        Text("In progress")
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(.indigo)
+                    } else {
+                        Text(TimeFormat.minutes(nap.duration))
+                            .font(.subheadline.weight(.bold))
+                            .foregroundStyle(.primary)
+                        Text("Total Sleep Time")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
                 }
             }
             .padding(.horizontal, 14)
@@ -221,25 +232,25 @@ struct NapDetailCard: View {
                 VStack(alignment: .trailing, spacing: 2) {
                     if nap.isOngoing {
                         TimelineView(.periodic(from: .now, by: 60)) { _ in
-                            Text(TimeFormat.minutes(nap.effectiveDuration))
+                            Text(TimeFormat.minutes(netMinutes))
                                 .font(.subheadline.weight(.bold))
                                 .foregroundStyle(.indigo)
                         }
-                        Text("In progress")
-                            .font(.caption2.weight(.semibold))
-                            .foregroundStyle(.indigo)
+                        Text("Net Sleep")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
                     } else {
-                        Text(TimeFormat.minutes(nap.duration))
+                        Text(TimeFormat.minutes(netMinutes))
                             .font(.subheadline.weight(.bold))
                             .foregroundStyle(.primary)
-                        Text("Total Sleep Time")
+                        Text("Net Sleep")
                             .font(.caption2)
                             .foregroundStyle(.secondary)
                     }
                 }
-                .frame(maxWidth: .infinity) // Simetri için frame genişletildi
+                .frame(maxWidth: .infinity)
             }
-            .padding(.vertical, 10) // Görsel boşluk için eklendi
+            .padding(.vertical, 10)
 
             // ── Breaks list (expandable) ───────────────────
             if !napBreaks.isEmpty {
@@ -273,7 +284,6 @@ struct NapDetailCard: View {
                     .buttonStyle(.plain)
 
                     if breaksExpanded {
-                        
                         ForEach(napBreaks) { br in
                             HStack {
                                 Text(TimeFormat.ampm(br.date))

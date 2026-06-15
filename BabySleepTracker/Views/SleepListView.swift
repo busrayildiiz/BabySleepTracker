@@ -16,15 +16,15 @@ struct SleepListView: View {
     }
 
     enum ActiveSheet: Identifiable {
-        case addSleep(editing: SleepRecord?)
+        case addSleep(editing: SleepRecord?, defaultDate: Date)
         case addBreak(napID: UUID, date: Date, napDuration: Int)
         case dayDetail(SelectedDay)
         case wakeTime
 
         var id: String {
             switch self {
-            case .addSleep(let editing):
-                return "addSleep-\(editing?.id.uuidString ?? "new")"
+            case .addSleep(let editing, let date):
+                return "addSleep-\(editing?.id.uuidString ?? "new")-\(date.timeIntervalSince1970)"
             case .addBreak(let id, _, _):
                 return "addBreak-\(id)"
             case .dayDetail(let day):
@@ -494,14 +494,12 @@ struct SleepListView: View {
         .sheet(item: $activeSheet) { sheet in
             switch sheet {
 
-            case .addSleep(let editing):
+            case .addSleep(let editing, let date):
                 AddRecordView(
-                    defaultDate: addDefaultDate,
+                    defaultDate: date,
                     editingRecord: editing,
                     vm: AddRecordViewModel(),
-                    onSave: { record in
-                        upsert(record)
-                    }
+                    onSave: { record in upsert(record) }
                 )
 
             case .addBreak(let napID, let date, let napDuration):
@@ -531,18 +529,16 @@ struct SleepListView: View {
                         saveRecords()
                     },
                     onAddSleep: { day in
-                        addDefaultDate = day
-                        activeSheet    = .addSleep(editing: nil)
+                        activeSheet = .addSleep(editing: nil, defaultDate: day)
                     },
                     onEditNap: { nap in
-                        activeSheet = .addSleep(editing: nap)
+                        activeSheet = .addSleep(editing: nap, defaultDate: nap.date)
                     },
                     onBreakSaved: { newBreak in
                         records.append(newBreak)
                         saveRecords()
                     }
                 )
-
             case .wakeTime:
                 WakeTimeEditorView(
                     initialTime: todayWakeRecord?.wakeTime ?? defaultWakeTime,
@@ -630,8 +626,7 @@ struct SleepListView: View {
         let label = isBedtime ? "BEDTIME" : "NEXT NAP"
 
         return Button {
-            addDefaultDate = displayTime
-            activeSheet = .addSleep(editing: nil)
+            activeSheet = .addSleep(editing: nil, defaultDate: displayTime)
         } label: {
             HStack(spacing: 12) {
                 VStack(alignment: .leading, spacing: 4) {
