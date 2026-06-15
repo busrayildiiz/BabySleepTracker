@@ -11,6 +11,7 @@ struct DayDetailView: View {
 
     let onDelete: (_ ids: Set<UUID>) -> Void
     let onAddSleep: (_ day: Date) -> Void
+    let onEditNap: (_ nap: SleepRecord) -> Void
     let onBreakSaved: (_ newBreak: SleepRecord) -> Void
 
     @State private var showAddMenu = false
@@ -33,34 +34,45 @@ struct DayDetailView: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(spacing: 14) {
-                    ForEach(Array(sortedNaps.enumerated()), id: \.element.id) { index, nap in
-                        let napBreaks = breaks.filter { $0.parentNapID == nap.id }.sorted { $0.date < $1.date }
-                        let napNumber = nap.kind == .dayNap
-                            ? sortedNaps.prefix(index + 1).filter { $0.kind == .dayNap }.count
-                            : 0
+            List {
+                ForEach(Array(sortedNaps.enumerated()), id: \.element.id) { index, nap in
+                    let napBreaks = breaks.filter { $0.parentNapID == nap.id }.sorted { $0.date < $1.date }
+                    let napNumber = nap.kind == .dayNap
+                        ? sortedNaps.prefix(index + 1).filter { $0.kind == .dayNap }.count
+                        : 0
 
-                        NapDetailCard(
-                            napNumber: napNumber,
-                            nap: nap,
-                            napBreaks: napBreaks,
-                            allBreaks: breaks,
-                            onAddBreakTap: {
-                                breakTargetNap = nap
-                                showAddBreak = true
-                            },
-                            onLongPress: {
-                                contextNap = nap
-                                showNapActions = true
-                            }
-                        )
+                    NapDetailCard(
+                        napNumber: napNumber,
+                        nap: nap,
+                        napBreaks: napBreaks,
+                        allBreaks: breaks,
+                        onAddBreakTap: {
+                            breakTargetNap = nap
+                            showAddBreak = true
+                        },
+                        onLongPress: {
+                            contextNap = nap
+                            showNapActions = true
+                        }
+                    )
+                    .listRowInsets(EdgeInsets(top: 7, leading: 16, bottom: 7, trailing: 16))
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        onEditNap(nap)
+                    }
+                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                        Button(role: .destructive) {
+                            onDelete([nap.id])
+                        } label: {
+                            Label("Delete", systemImage: "trash")
+                        }
                     }
                 }
-                .padding(.horizontal, 16)
-                .padding(.top, 12)
-                .padding(.bottom, 32)
             }
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
             .background(Color(.systemGroupedBackground))
             .navigationTitle(dayTitle)
             .navigationBarTitleDisplayMode(.inline)
@@ -83,6 +95,9 @@ struct DayDetailView: View {
                 isPresented: $showNapActions,
                 titleVisibility: .visible
             ) {
+                Button("Edit") {
+                    if let nap = contextNap { onEditNap(nap) }
+                }
                 Button("Add Wake Period") {
                     breakTargetNap = contextNap
                     showAddBreak = true
@@ -130,9 +145,15 @@ struct NapDetailCard: View {
     @State private var breaksExpanded = true
 
     private var isNight: Bool { nap.kind == .nightSleep }
-    private var napTint: Color { isNight ? .indigo : .orange }
+    
+    private var napTint: Color {
+        nap.isOngoing ? .indigo : (isNight ? .indigo : .orange)
+    }
+    
     private var netMinutes: Int { nap.totalMinutes(breaks: allBreaks) }
-    private var napEnd: Date { nap.date.addingTimeInterval(TimeInterval(nap.duration * 60)) }
+    private var napEnd: Date {
+        nap.date.addingTimeInterval(TimeInterval(nap.effectiveDuration * 60))
+    }
     private var title: String { isNight ? "Night Sleep" : "Day Nap" }
 
     var body: some View {
@@ -197,18 +218,28 @@ struct NapDetailCard: View {
                 Divider().frame(height: 36)
 
                 // Net sleep
-                VStack(spacing: 4) {
-                    Text(TimeFormat.minutes(netMinutes))
-                        .font(.title2.weight(.bold))
-                        .foregroundStyle(.indigo)
-                    Text("Net Sleep")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                VStack(alignment: .trailing, spacing: 2) {
+                    if nap.isOngoing {
+                        TimelineView(.periodic(from: .now, by: 60)) { _ in
+                            Text(TimeFormat.minutes(nap.effectiveDuration))
+                                .font(.subheadline.weight(.bold))
+                                .foregroundStyle(.indigo)
+                        }
+                        Text("In progress")
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(.indigo)
+                    } else {
+                        Text(TimeFormat.minutes(nap.duration))
+                            .font(.subheadline.weight(.bold))
+                            .foregroundStyle(.primary)
+                        Text("Total Sleep Time")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
                 }
-                .frame(maxWidth: .infinity)
+                .frame(maxWidth: .infinity) // Simetri için frame genişletildi
             }
-            .padding(.vertical, 14)
-            .padding(.horizontal, 14)
+            .padding(.vertical, 10) // Görsel boşluk için eklendi
 
             // ── Breaks list (expandable) ───────────────────
             if !napBreaks.isEmpty {
@@ -242,8 +273,8 @@ struct NapDetailCard: View {
                     .buttonStyle(.plain)
 
                     if breaksExpanded {
+                        
                         ForEach(napBreaks) { br in
-                            let brEnd = br.date.addingTimeInterval(TimeInterval(br.duration * 60))
                             HStack {
                                 Text(TimeFormat.ampm(br.date))
                                     .font(.subheadline)

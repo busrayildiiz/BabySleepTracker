@@ -16,17 +16,21 @@ struct SleepListView: View {
     }
 
     enum ActiveSheet: Identifiable {
-        case addSleep
+        case addSleep(editing: SleepRecord?)
         case addBreak(napID: UUID, date: Date, napDuration: Int)
         case dayDetail(SelectedDay)
         case wakeTime
 
         var id: String {
             switch self {
-            case .addSleep:                return "addSleep"
-            case .addBreak(let id, _, _):  return "addBreak-\(id)"
-            case .dayDetail(let day):      return "dayDetail-\(day.id)"
-            case .wakeTime:                return "wakeTime"
+            case .addSleep(let editing):
+                return "addSleep-\(editing?.id.uuidString ?? "new")"
+            case .addBreak(let id, _, _):
+                return "addBreak-\(id)"
+            case .dayDetail(let day):
+                return "dayDetail-\(day.id)"
+            case .wakeTime:
+                return "wakeTime"
             }
         }
     }
@@ -69,6 +73,15 @@ struct SleepListView: View {
     @AppStorage("parentName") private var parentName: String = ""
 
     // MARK: - Persistence
+    
+    private func upsert(_ record: SleepRecord) {
+        if let index = records.firstIndex(where: { $0.id == record.id }) {
+            records[index] = record
+        } else {
+            records.append(record)
+        }
+        saveRecords()
+    }
 
     private func saveRecords() {
         if let encoded = try? JSONEncoder().encode(records) {
@@ -481,13 +494,13 @@ struct SleepListView: View {
         .sheet(item: $activeSheet) { sheet in
             switch sheet {
 
-            case .addSleep:
+            case .addSleep(let editing):
                 AddRecordView(
                     defaultDate: addDefaultDate,
+                    editingRecord: editing,
                     vm: AddRecordViewModel(),
-                    onSave: { newRecord in
-                        records.append(newRecord)
-                        saveRecords()
+                    onSave: { record in
+                        upsert(record)
                     }
                 )
 
@@ -519,7 +532,10 @@ struct SleepListView: View {
                     },
                     onAddSleep: { day in
                         addDefaultDate = day
-                        activeSheet    = .addSleep
+                        activeSheet    = .addSleep(editing: nil)
+                    },
+                    onEditNap: { nap in
+                        activeSheet = .addSleep(editing: nap)
                     },
                     onBreakSaved: { newBreak in
                         records.append(newBreak)
@@ -615,7 +631,7 @@ struct SleepListView: View {
 
         return Button {
             addDefaultDate = displayTime
-            activeSheet = .addSleep
+            activeSheet = .addSleep(editing: nil)
         } label: {
             HStack(spacing: 12) {
                 VStack(alignment: .leading, spacing: 4) {
