@@ -434,25 +434,33 @@ struct SleepListView: View {
         saveRecords()
     }
 
+
     // MARK: - Body
 
     var body: some View {
         NavigationStack {
             ScrollView(showsIndicators: false) {
-                VStack(spacing: 16) {
+                VStack(spacing: 12) {
                     headerSection
-                    sleepCoachCard
-                    summaryStatsCard
-                    wakeTimeCard
-                    nextNapCard
+                    totalSleepCard
+                    nextNapOrBedtimeCard
+
+                    if orchestrator.snapshot?.nextSleepKind == .nap {
+                        bedtimeWindowCard
+                    }
+
+                    statsRow
                     todayTimelineCard
+                    coachInsightCard
+                    todayWakeUpCard
+
                     if !records.isEmpty { recentDaysSection }
                 }
                 .padding(.horizontal, 16)
-                .padding(.top, 34)
+                .padding(.top, 12)
                 .padding(.bottom, 112)
             }
-            .background(Color.sleepBackground)
+            .background(Color(.systemGroupedBackground))
             .navigationBarHidden(true)
             .onAppear {
                 loadRecords()
@@ -472,6 +480,7 @@ struct SleepListView: View {
         }
         .sheet(item: $activeSheet) { sheet in
             switch sheet {
+
             case .addSleep:
                 AddRecordView(
                     defaultDate: addDefaultDate,
@@ -481,6 +490,7 @@ struct SleepListView: View {
                         saveRecords()
                     }
                 )
+
             case .addBreak(let napID, let date, let napDuration):
                 let existing = records.filter {
                     $0.parentNapID == napID && $0.kind == .break
@@ -495,6 +505,7 @@ struct SleepListView: View {
                         saveRecords()
                     }
                 )
+
             case .dayDetail(let selected):
                 let dayRecords = records
                     .filter { Calendar.current.isDate($0.date, inSameDayAs: selected.day) }
@@ -515,6 +526,7 @@ struct SleepListView: View {
                         saveRecords()
                     }
                 )
+
             case .wakeTime:
                 WakeTimeEditorView(
                     initialTime: todayWakeRecord?.wakeTime ?? defaultWakeTime,
@@ -523,114 +535,209 @@ struct SleepListView: View {
             }
         }
     }
-
     // MARK: - Header
 
     private var headerSection: some View {
-        HStack(alignment: .top, spacing: 10) {
-            VStack(alignment: .leading, spacing: 11) {
-                Text("Hello, \(displayedParentName) 👋")
-                    .font(.system(size: 24, weight: .bold, design: .rounded))
-                    .foregroundStyle(Color.sleepInk)
-                    .lineLimit(1).minimumScaleFactor(0.72)
-                HStack(spacing: 10) {
-                    Image(systemName: "sparkles")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(Color.sleepPurple)
-                    Text("\(babyName)'s AI Sleep Coach is here")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(Color.sleepMuted)
-                        .lineLimit(1).minimumScaleFactor(0.78)
+        HStack(alignment: .center, spacing: 10) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Good day, \(displayedParentName) 👋")
+                    .font(.system(size: 13))
+                    .foregroundStyle(.secondary)
+                Text("Today's Sleep")
+                    .font(.system(size: 22, weight: .medium, design: .rounded))
+                    .foregroundStyle(.primary)
+            }
+            Spacer()
+            MoonHeaderArt()
+                .frame(width: 64, height: 50)
+        }
+        .padding(.top, 6)
+    }
+    
+    //MARK: Total Sleep Card
+    
+    private var totalSleepCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("TOTAL SLEEP TODAY")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(Color.sleepPurpleDeep)
+
+                    HStack(alignment: .lastTextBaseline, spacing: 4) {
+                        Text("\(todayTotal / 60)")
+                            .font(.system(size: 32, weight: .medium, design: .rounded))
+                            .foregroundStyle(.primary)
+                        Text("h")
+                            .font(.system(size: 15))
+                            .foregroundStyle(.secondary)
+                        Text("\(todayTotal % 60)")
+                            .font(.system(size: 32, weight: .medium, design: .rounded))
+                            .foregroundStyle(.primary)
+                        Text("min")
+                            .font(.system(size: 15))
+                            .foregroundStyle(.secondary)
+                    }
+
+                    Text(changeLabel(todayDelta))
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(todayDelta >= 0 ? Color.sleepPurpleDeep : .orange)
+                }
+
+                Spacer()
+
+                VStack(alignment: .trailing, spacing: 2) {
+                    Text("Goal").font(.system(size: 11)).foregroundStyle(.secondary)
+                    Text("14h").font(.system(size: 18, weight: .semibold)).foregroundStyle(.primary)
+                    Text("AAP guideline").font(.system(size: 10)).foregroundStyle(.secondary)
                 }
             }
-            Spacer(minLength: 4)
-            MoonHeaderArt()
-                .frame(width: 88, height: 70)
-                .padding(.top, -12)
+
+            ProgressView(value: min(Double(todayTotal), 840), total: 840)
+                .tint(Color.sleepPurple)
         }
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(Color(.secondarySystemGroupedBackground))
+        )
     }
+    
+    // MARK: next nap or bedtime?
+    
+    private var nextNapOrBedtimeCard: some View {
+        let isBedtime = orchestrator.snapshot?.nextSleepKind == .bedtime
+        let displayTime = isBedtime
+            ? (orchestrator.snapshot?.night.optimalBedtimeStart ?? nextNapTime)
+            : nextNapTime
+        let icon = isBedtime ? "moon.stars.fill" : "moon.fill"
+        let label = isBedtime ? "BEDTIME" : "NEXT NAP"
 
-    // MARK: - Sleep Coach Card
-
-    private var sleepCoachCard: some View {
-        ZStack(alignment: .topLeading) {
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .fill(LinearGradient(
-                    colors: [Color.sleepPurple, Color.sleepLilac, Color.sleepPurpleDeep],
-                    startPoint: .topLeading, endPoint: .bottomTrailing
-                ))
-            VStack(alignment: .leading, spacing: 14) {
-                HStack(alignment: .top) {
-                    VStack(alignment: .leading, spacing: 14) {
-                        Text("✦ AI SLEEP COACH")
-                            .font(.system(size: 10, weight: .heavy))
+        return Button {
+            addDefaultDate = displayTime
+            activeSheet = .addSleep
+        } label: {
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(label)
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(Color.sleepPurpleDeep)
+                    Text(shortTime(displayTime))
+                        .font(.system(size: 26, weight: .medium, design: .rounded))
+                        .foregroundStyle(.primary)
+                    Text("Window: \(recommendationWindow)")
+                        .font(.system(size: 12))
+                        .foregroundStyle(Color.sleepPurpleDeep.opacity(0.8))
+                }
+                Spacer()
+                VStack(spacing: 4) {
+                    ZStack {
+                        Circle().fill(Color.sleepPurpleDeep).frame(width: 46, height: 46)
+                        Image(systemName: icon)
+                            .font(.system(size: 20))
                             .foregroundStyle(.white)
-                            .padding(.horizontal, 12).padding(.vertical, 7)
-                            .background(Capsule().fill(Color.sleepPurpleDeep.opacity(0.52)))
-                        VStack(alignment: .leading, spacing: 7) {
-                            Text(latestSleep == nil ? "Ready for a nap!" : "Great nap! 💜")
-                                .font(.system(size: 26, weight: .bold, design: .rounded))
-                                .foregroundStyle(.white)
-                                .lineLimit(1).minimumScaleFactor(0.76)
-                            Text(latestSleep == nil ? "\(babyName) can start today" : "\(babyName) slept")
-                                .font(.system(size: 14, weight: .medium))
-                                .foregroundStyle(.white.opacity(0.84))
-                            Text(latestSleep == nil ? "No sleep yet" : TimeFormat.minutes(latestSleepMinutes))
-                                .font(.system(size: 34, weight: .bold, design: .rounded))
-                                .foregroundStyle(.white)
-                                .lineLimit(1).minimumScaleFactor(0.74)
-                        }
-                        trendPill
                     }
-                    Spacer(minLength: 8)
-                    SleepFaceProgress(progress: Double(consistencyPercent) / 100)
-                        .frame(width: 88, height: 88)
-                        .padding(.top, 34)
+                    Text("\(confidencePercent)% conf.")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(Color.sleepPurpleDeep)
                 }
-                Button {
-                    activeSheet = .dayDetail(SelectedDay(day: Date()))
-                } label: {
-                    coachInsight
-                }
-                .buttonStyle(CardPressButtonStyle())
             }
             .padding(16)
+            .contentShape(Rectangle())
+            .background(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(Color.sleepPurple.opacity(0.12))
+            )
         }
-        .frame(maxWidth: .infinity)
+        .buttonStyle(CardPressButtonStyle())
+    }
+     // MARK: Bedtime Window Card
+    
+    @ViewBuilder
+    private var bedtimeWindowCard: some View {
+        if let night = orchestrator.snapshot?.night {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("BEDTIME WINDOW")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                    Text("\(shortTime(night.optimalBedtimeStart)) – \(shortTime(night.optimalBedtimeEnd))")
+                        .font(.system(size: 18, weight: .medium, design: .rounded))
+                        .foregroundStyle(.primary)
+                    Text("Overtired risk after \(shortTime(night.overtiredRiskTime))")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.orange)
+                }
+                Spacer()
+                Image(systemName: "moon.stars")
+                    .font(.system(size: 24))
+                    .foregroundStyle(.secondary)
+            }
+            .padding(16)
+            .background(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(Color(.secondarySystemGroupedBackground))
+            )
+        }
+    }
+    
+    
+    //MARK: Stats Row
+    
+    private var statsRow: some View {
+        HStack(spacing: 10) {
+            statCard(
+                title: "WAKE WINDOW",
+                value: TimeFormat.minutes(
+                    orchestrator.snapshot?.pattern?.averageWakeWindowMinutes ?? wakeWindowBeforeLatest
+                ),
+                subtitle: "Observed avg",
+                subtitleColor: .secondary
+            )
+            statCard(
+                title: "CONSISTENCY",
+                value: consistencyPercent > 80 ? "Good" : "Building",
+                subtitle: "\(consistencyPercent)% this week",
+                subtitleColor: Color.sleepGreen
+            )
+        }
     }
 
-    private var trendPill: some View {
-        let hasData  = latestSleep != nil
-        let positive = latestNapDelta >= 0
-        return HStack(spacing: 7) {
-            Image(systemName: hasData ? (positive ? "arrow.up" : "arrow.down") : "sparkles")
-                .font(.system(size: 11, weight: .bold))
-            Text(hasData
-                 ? "\(TimeFormat.minutes(abs(latestNapDelta))) \(positive ? "longer" : "shorter") than predicted"
-                 : "Add a session for predictions")
-                .font(.system(size: 12, weight: .bold))
-                .lineLimit(1).minimumScaleFactor(0.78)
+    private func statCard(title: String, value: String, subtitle: String, subtitleColor: Color) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(.secondary)
+            Text(value)
+                .font(.system(size: 19, weight: .medium, design: .rounded))
+                .foregroundStyle(.primary)
+            Text(subtitle)
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(subtitleColor)
         }
-        .foregroundStyle(hasData && !positive ? Color.orange : Color.sleepGreen)
-        .padding(.horizontal, 11).padding(.vertical, 7)
-        .background(Capsule().fill(Color.white.opacity(0.74)))
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(14)
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(Color(.secondarySystemGroupedBackground))
+        )
     }
-
-    private var coachInsight: some View {
-        HStack(alignment: .center, spacing: 12) {
-            Image(systemName: "brain.head.profile")
-                .font(.system(size: 20, weight: .semibold))
-                .foregroundStyle(Color.sleepPurpleDeep)
-                .frame(width: 30)
-            VStack(alignment: .leading, spacing: 5) {
+    //MARK: Coach insight Card
+    private var coachInsightCard: some View {
+        HStack(alignment: .top, spacing: 12) {
+            ZStack {
+                Circle().fill(Color.sleepPurple.opacity(0.14)).frame(width: 32, height: 32)
+                Image(systemName: "brain.head.profile")
+                    .font(.system(size: 15))
+                    .foregroundStyle(Color.sleepPurpleDeep)
+            }
+            VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 6) {
                     Text("Coach Insight")
-                        .font(.system(size: 15, weight: .bold))
-                        .foregroundStyle(Color.sleepInk)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.primary)
                     if orchestrator.isLLMLoading {
-                        ProgressView()
-                            .scaleEffect(0.55)
-                            .tint(Color.sleepPurpleDeep)
+                        ProgressView().scaleEffect(0.5).tint(Color.sleepPurpleDeep)
                     } else if orchestrator.llmResponse != nil {
                         Text("AI")
                             .font(.system(size: 8, weight: .heavy))
@@ -640,273 +747,60 @@ struct SleepListView: View {
                     }
                 }
                 Text(insightText)
-                    .font(.system(size: 13))
-                    .foregroundStyle(Color.sleepInk)
-                    .lineSpacing(2).lineLimit(3)
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+                    .lineSpacing(2)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            Spacer(minLength: 6)
-            Image(systemName: "chevron.right")
-                .font(.system(size: 15, weight: .bold))
-                .foregroundStyle(Color.sleepInk)
         }
-        .padding(14)
+        .padding(16)
         .background(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(Color.white.opacity(0.82))
-        )
-    }
-
-    // MARK: - Stats
-
-    private var summaryStatsCard: some View {
-        HStack(alignment: .top, spacing: 0) {
-            metricItem(
-                icon: "moon.fill", iconColor: .sleepPurple,
-                title: "Today", value: TimeFormat.minutes(todayTotal),
-                change: changeLabel(todayDelta)
-            )
-            Divider().padding(.vertical, 12)
-            metricItem(
-                icon: "cloud.fill", iconColor: .sleepCloud,
-                title: "7-Day Avg", value: TimeFormat.minutes(last7DaysAverage),
-                change: changeLabel(last7DaysAverage - previous7DaysAverage)
-            )
-            Divider().padding(.vertical, 12)
-            consistencyItem
-        }
-        .padding(.vertical, 10)
-        .background(
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .fill(Color(.systemBackground))
-                .shadow(color: Color.sleepInk.opacity(0.05), radius: 14, x: 0, y: 7)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .stroke(Color.sleepStroke, lineWidth: 1)
         )
     }
-
-    private func metricItem(
-        icon: String, iconColor: Color,
-        title: String, value: String, change: String
-    ) -> some View {
-        VStack(spacing: 6) {
-            ZStack {
-                Circle().fill(iconColor.opacity(0.11)).frame(width: 36, height: 36)
-                Image(systemName: icon)
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(iconColor)
-            }
-            VStack(spacing: 3) {
-                Text(title)
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(Color.sleepInk)
-                    .lineLimit(2).multilineTextAlignment(.center)
-                Text(value)
-                    .font(.system(size: 17, weight: .bold, design: .rounded))
-                    .foregroundStyle(Color.sleepInk)
-                    .lineLimit(1).minimumScaleFactor(0.7)
-                Text(change)
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(change.hasPrefix("-") ? Color.orange : Color.sleepGreen)
-                    .lineLimit(1).minimumScaleFactor(0.68)
-            }
-        }
-        .frame(maxWidth: .infinity).padding(.horizontal, 6)
-    }
-
-    private var consistencyItem: some View {
-        VStack(spacing: 6) {
-            ZStack {
-                Circle().fill(Color.sleepSun.opacity(0.12)).frame(width: 36, height: 36)
-                Image(systemName: "star.fill")
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(Color.sleepSun)
-            }
-            VStack(spacing: 3) {
-                Text("Consistency")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(Color.sleepInk)
-                    .lineLimit(1).minimumScaleFactor(0.62)
-                Text(consistencyPercent > 80 ? "Good" : "Building")
-                    .font(.system(size: 16, weight: .bold, design: .rounded))
-                    .foregroundStyle(Color.sleepInk)
-                    .lineLimit(1).minimumScaleFactor(0.66)
-            }
-            ZStack {
-                Circle().stroke(Color.sleepPurple.opacity(0.12), lineWidth: 4)
-                Circle().trim(from: 0, to: Double(consistencyPercent) / 100)
-                    .stroke(Color.sleepPurpleDeep,
-                            style: StrokeStyle(lineWidth: 4, lineCap: .round))
-                    .rotationEffect(.degrees(-90))
-                Text("\(consistencyPercent)%")
-                    .font(.system(size: 10, weight: .bold))
-                    .foregroundStyle(Color.sleepInk)
-            }
-            .frame(width: 36, height: 36)
-        }
-        .frame(maxWidth: .infinity).padding(.horizontal, 6)
-    }
-
-    // MARK: - Wake Time Card
-
-    private var wakeTimeCard: some View {
+    // MARK: Today Wakeup Card
+    private var todayWakeUpCard: some View {
         Button { activeSheet = .wakeTime } label: {
-            HStack(spacing: 12) {
-                ZStack {
-                    Circle().fill(Color.sleepSun.opacity(0.12)).frame(width: 42, height: 42)
+            HStack {
+                HStack(spacing: 10) {
                     Image(systemName: "sunrise.fill")
-                        .font(.system(size: 19, weight: .semibold))
+                        .font(.system(size: 18))
                         .foregroundStyle(Color.sleepSun)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Today's wake-up")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(.primary)
+                        Text(todayWakeRecord == nil
+                             ? "Add the time \(babyName) woke up"
+                             : "Used for predictions")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                    }
                 }
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("Today's Wake-up")
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundStyle(Color.sleepInk)
-                    Text(todayWakeRecord == nil
-                         ? "Add the time \(babyName) woke up"
-                         : "Used to calculate the next sleep window")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(Color.sleepMuted)
-                        .lineLimit(1).minimumScaleFactor(0.78)
-                }
-                Spacer(minLength: 8)
+                Spacer()
                 Text(todayWakeRecord.map { shortTime($0.wakeTime) } ?? "Add time")
-                    .font(.system(size: 15, weight: .bold, design: .rounded))
-                    .foregroundStyle(todayWakeRecord == nil
-                                     ? Color.sleepPurpleDeep : Color.sleepInk)
-                    .padding(.horizontal, 11).padding(.vertical, 7)
-                    .background(
-                        RoundedRectangle(cornerRadius: 9, style: .continuous)
-                            .fill(Color.sleepPurple.opacity(0.09))
-                    )
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundStyle(Color.sleepPurpleDeep)
+                    .font(.system(size: 15, weight: .semibold, design: .rounded))
+                    .foregroundStyle(todayWakeRecord == nil ? Color.sleepPurpleDeep : .primary)
             }
-            .padding(13).contentShape(Rectangle())
+            .padding(16)
+            .contentShape(Rectangle())
             .background(
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
                     .fill(Color(.systemBackground))
-                    .shadow(color: Color.sleepInk.opacity(0.04), radius: 12, x: 0, y: 6)
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
                     .stroke(Color.sleepStroke, lineWidth: 1)
             )
         }
-        .buttonStyle(CardPressButtonStyle())
+        .buttonStyle(.plain)
     }
-
-    // MARK: - Next Nap Card
-
-    private var nextNapCard: some View {
-        VStack(spacing: 12) {
-            Button {
-                addDefaultDate = nextNapTime
-                activeSheet    = .addSleep
-            } label: {
-                HStack(alignment: .center, spacing: 10) {
-                    ZStack {
-                        Circle().fill(Color.sleepSun.opacity(0.13)).frame(width: 44, height: 44)
-                        Image(systemName: "sun.max.fill")
-                            .font(.system(size: 22, weight: .semibold))
-                            .foregroundStyle(Color.sleepSun)
-                    }
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack(spacing: 6) {
-                            Text("Next Nap")
-                                .font(.system(size: 15, weight: .bold))
-                                .foregroundStyle(Color.sleepInk)
-                            Image(systemName: "info.circle")
-                                .font(.system(size: 12, weight: .semibold))
-                                .foregroundStyle(Color.sleepPurpleDeep)
-                        }
-                        Text(shortTime(nextNapTime))
-                            .font(.system(size: 24, weight: .bold, design: .rounded))
-                            .foregroundStyle(Color.sleepInk)
-                            .lineLimit(1).minimumScaleFactor(0.72)
-                    }
-                    Spacer(minLength: 4)
-                    VStack(spacing: 4) {
-                        Text("\(confidencePercent)%")
-                            .font(.system(size: 15, weight: .bold, design: .rounded))
-                            .foregroundStyle(Color.sleepPurpleDeep)
-                            .padding(.horizontal, 11).padding(.vertical, 6)
-                            .background(
-                                RoundedRectangle(cornerRadius: 9, style: .continuous)
-                                    .fill(Color.sleepPurple.opacity(0.12))
-                            )
-                        Text("Confidence")
-                            .font(.system(size: 10, weight: .semibold))
-                            .foregroundStyle(Color.sleepInk)
-                    }
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundStyle(Color.sleepPurpleDeep)
-                }
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(CardPressButtonStyle())
-
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Recommended window")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(Color.sleepPurpleDeep)
-                    Text(recommendationWindow)
-                        .font(.system(size: 15, weight: .bold, design: .rounded))
-                        .foregroundStyle(Color.sleepInk)
-                }
-                .padding(.horizontal, 14).padding(.vertical, 10)
-                .background(
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .fill(Color.sleepPurple.opacity(0.09))
-                )
-                Spacer()
-            }
-            .padding(.leading, 54)
-
-            Divider().background(Color.sleepStroke)
-
-            Button {
-                activeSheet = .dayDetail(SelectedDay(day: Date()))
-            } label: {
-                HStack(spacing: 10) {
-                    Image(systemName: "lightbulb")
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundStyle(Color.sleepPurpleDeep)
-                        .frame(width: 34, height: 34)
-                        .background(Circle().fill(Color.sleepPurple.opacity(0.08)))
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text("Why this recommendation?")
-                            .font(.system(size: 13, weight: .bold))
-                            .foregroundStyle(Color.sleepInk)
-                        Text("Based on science, \(babyName)'s patterns and today's data.")
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundStyle(Color.sleepMuted).lineLimit(2)
-                    }
-                    Spacer()
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundStyle(Color.sleepPurpleDeep)
-                }
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(CardPressButtonStyle())
-        }
-        .padding(14)
-        .background(
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .fill(Color.sleepWarmCard)
-                .shadow(color: Color.sleepSun.opacity(0.07), radius: 14, x: 0, y: 8)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .stroke(Color.sleepSun.opacity(0.13), lineWidth: 1)
-        )
-    }
+    
 
     // MARK: - Timeline Card
 
@@ -1245,51 +1139,6 @@ private struct MoonHeaderArt: View {
     }
 }
 
-private struct SleepFaceProgress: View {
-    let progress: Double
-    private let ringWidth: CGFloat = 10
-
-    var body: some View {
-        GeometryReader { proxy in
-            let side = min(proxy.size.width, proxy.size.height)
-            ZStack {
-                Circle()
-                    .stroke(Color.white.opacity(0.18), lineWidth: 1.2)
-                    .frame(width: side * 1.22, height: side * 1.22)
-                Circle()
-                    .inset(by: ringWidth / 2)
-                    .stroke(Color.white.opacity(0.22), lineWidth: ringWidth)
-                Circle()
-                    .inset(by: ringWidth / 2)
-                    .trim(from: 0, to: progress)
-                    .stroke(Color.sleepPurpleDeep,
-                            style: StrokeStyle(lineWidth: ringWidth, lineCap: .round))
-                    .rotationEffect(.degrees(-88))
-                Circle()
-                    .fill(Color.white.opacity(0.78))
-                    .padding(side * 0.24)
-                VStack(spacing: side * 0.055) {
-                    HStack(spacing: side * 0.15) {
-                        SleepArcEye().frame(width: side * 0.13, height: side * 0.08)
-                        SleepArcEye().frame(width: side * 0.13, height: side * 0.08)
-                    }
-                    SleepSmile()
-                        .stroke(Color.sleepPurpleDeep,
-                                style: StrokeStyle(lineWidth: 3, lineCap: .round))
-                        .frame(width: side * 0.24, height: side * 0.13)
-                }
-                HStack(spacing: side * 0.45) {
-                    Circle().fill(Color.pink.opacity(0.20))
-                        .frame(width: side * 0.13, height: side * 0.13)
-                    Circle().fill(Color.pink.opacity(0.20))
-                        .frame(width: side * 0.13, height: side * 0.13)
-                }.offset(y: side * 0.14)
-            }
-            .frame(width: proxy.size.width, height: proxy.size.height)
-        }
-        .shadow(color: Color.sleepInk.opacity(0.08), radius: 8, x: 0, y: 6)
-    }
-}
 
 private struct SleepArcEye: View {
     var body: some View {
