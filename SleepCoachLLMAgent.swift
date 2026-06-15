@@ -216,7 +216,7 @@ final class DefaultSleepCoachLLMAgent: SleepCoachLLMAgentProtocol {
         request.httpMethod  = "POST"
         request.setValue("application/json",          forHTTPHeaderField: "Content-Type")
         request.setValue("2023-06-01",                forHTTPHeaderField: "anthropic-version")
-        // API key buraya gelecek — Orchestrator'dan inject edilecek
+        request.setValue(APIConfig.anthropicKey, forHTTPHeaderField: "x-api-key")
 
         let body: [String: Any] = [
             "model":      "claude-sonnet-4-6",

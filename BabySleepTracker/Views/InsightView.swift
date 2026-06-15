@@ -39,7 +39,9 @@ struct InsightsView: View {
             }
             .background(CoachColor.background)
             .navigationBarHidden(true)
-            .onAppear { refresh() }
+            .onAppear {
+                orchestrator.loadCachedLLMResponse()
+                refresh() }
             .onReceive(NotificationCenter.default.publisher(for: .sleepRecordsDidChange))      { _ in refresh() }
             .onReceive(NotificationCenter.default.publisher(for: .dailyWakeRecordsDidChange)) { _ in refresh() }
             .environment(\.locale, Locale(identifier: "en_US"))
@@ -311,6 +313,25 @@ struct InsightsView: View {
                         }
                     }
                 }
+                if let llmAlert = orchestrator.llmResponse?.alert,
+                   !llmAlert.isEmpty {
+                    if !alerts.isEmpty {
+                        Divider().overlay(CoachColor.stroke).padding(.leading, 48)
+                    }
+                    HStack(spacing: 11) {
+                        iconCircle("exclamationmark.triangle.fill", color: CoachColor.sun, size: 38)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("AI Coach Alert")
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundStyle(CoachColor.ink)
+                            Text(llmAlert)
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundStyle(CoachColor.muted)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                    .padding(.vertical, 9)
+                }
             }
             .padding(15)
             .background(cardBackground)
@@ -351,7 +372,8 @@ struct InsightsView: View {
 
         // MARK: - Coach Tip Card
 
-        private var coachTipCard: some View {
+    private var coachTipCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 13) {
                 ZStack {
                     RoundedRectangle(cornerRadius: 12, style: .continuous)
@@ -361,24 +383,110 @@ struct InsightsView: View {
                         .font(.system(size: 25, weight: .medium))
                         .foregroundStyle(CoachColor.purpleDeep)
                 }
+
                 VStack(alignment: .leading, spacing: 4) {
-                    Label("AI COACH TIP", systemImage: "sparkles")
-                        .font(.system(size: 9, weight: .bold))
-                        .foregroundStyle(CoachColor.purple)
+                    HStack(spacing: 6) {
+                        Label("AI COACH TIP", systemImage: "sparkles")
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundStyle(CoachColor.purple)
+
+                        // LLM yükleniyorsa spinner
+                        if orchestrator.isLLMLoading {
+                            ProgressView()
+                                .scaleEffect(0.6)
+                                .tint(CoachColor.purple)
+                        }
+                    }
+
                     Text(tipTitle)
                         .font(.system(size: 12, weight: .bold))
                         .foregroundStyle(CoachColor.ink)
-                    Text(orchestrator.snapshot?.insights.coachTip ?? "Keep logging to unlock personalized tips.")
+
+                    // LLM varsa onun mesajını, yoksa Rule Engine'inkini göster
+                    Text(coachTipText)
                         .font(.system(size: 10, weight: .medium))
                         .foregroundStyle(CoachColor.muted)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
-            .padding(15)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(cardBackground)
-            .overlay(cardStroke(cornerRadius: 16))
-        }
+            
+            // LLM pattern insight varsa ayrı satırda göster
+            if let insight = orchestrator.llmResponse?.patternInsight,
+               !insight.isEmpty {
+                Divider().overlay(CoachColor.stroke)
+
+                HStack(alignment: .top, spacing: 8) {
+                    Image(systemName: "chart.line.uptrend.xyaxis")
+                        .font(.system(size: 12))
+                        .foregroundStyle(CoachColor.purpleDeep)
+                        .padding(.top, 1)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("Pattern Analysis")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundStyle(CoachColor.purpleDeep)
+                        Text(insight)
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundStyle(CoachColor.muted)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            }
+
+            // LLM alert varsa göster
+            if let alert = orchestrator.llmResponse?.alert,
+               !alert.isEmpty {
+                Divider().overlay(CoachColor.stroke)
+
+                HStack(spacing: 8) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.system(size: 12))
+                        .foregroundStyle(CoachColor.sun)
+                    Text(alert)
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(CoachColor.ink)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(10)
+                .background(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(CoachColor.sun.opacity(0.08))
+                )
+            }
+            
+            // Confidence note + manuel refresh butonu
+                 HStack {
+                     if let note = orchestrator.llmResponse?.confidenceNote {
+                         Text(note)
+                             .font(.system(size: 9, weight: .medium))
+                             .foregroundStyle(CoachColor.muted)
+                             .italic()
+                     }
+                     Spacer()
+                     Button {
+                         orchestrator.refreshLLM()
+                     } label: {
+                         HStack(spacing: 4) {
+                             Image(systemName: "arrow.clockwise")
+                                 .font(.system(size: 9, weight: .semibold))
+                             Text("Refresh")
+                                 .font(.system(size: 9, weight: .semibold))
+                         }
+                         .foregroundStyle(CoachColor.purpleDeep)
+                         .padding(.horizontal, 8)
+                         .padding(.vertical, 4)
+                         .background(
+                             Capsule()
+                                 .fill(CoachColor.purple.opacity(0.08))
+                         )
+                     }
+                     .buttonStyle(.plain)
+                 }
+             }
+             .padding(15)
+             .frame(maxWidth: .infinity, alignment: .leading)
+             .background(cardBackground)
+             .overlay(cardStroke(cornerRadius: 16))
+         }
 
         // MARK: - Prediction Details
 
@@ -520,6 +628,21 @@ struct InsightsView: View {
             let trimmed = babyName.trimmingCharacters(in: .whitespacesAndNewlines)
             return trimmed.isEmpty ? (orchestrator.snapshot?.babyName ?? "Baby") : trimmed
         }
+    
+    private var coachTipText: String {
+        // LLM yüklendiyse onun mesajını göster
+        if let llmMessage = orchestrator.llmResponse?.coachMessage,
+           !llmMessage.isEmpty {
+            return llmMessage
+        }
+        // LLM yükleniyorsa bekle mesajı
+        if orchestrator.isLLMLoading {
+            return "Analyzing \(displayedBabyName)'s sleep patterns..."
+        }
+        // Fallback: Rule Engine mesajı
+        return orchestrator.snapshot?.insights.coachTip
+            ?? "Keep logging to unlock personalized tips."
+    }
 
         private var modeLabel: String {
             guard let phase = orchestrator.snapshot?.phase else { return "BASELINE" }
