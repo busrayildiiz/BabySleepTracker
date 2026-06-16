@@ -45,11 +45,13 @@ struct SleepListView: View {
         let isActive: Bool
         let isFuture: Bool
         var awakeBeforeMinutes: Int
+        var isOverdue: Bool
         
         init(icon: String, iconColor: Color, time: String,
                 title: String, detail: String,
                 isActive: Bool, isFuture: Bool,
-                awakeBeforeMinutes: Int = 0) {  // ← default 0
+                awakeBeforeMinutes: Int = 0,
+                isOverdue: Bool = false) {
                self.icon                = icon
                self.iconColor           = iconColor
                self.time                = time
@@ -58,6 +60,7 @@ struct SleepListView: View {
                self.isActive            = isActive
                self.isFuture            = isFuture
                self.awakeBeforeMinutes  = awakeBeforeMinutes
+               self.isOverdue           = isOverdue
            }
     }
 
@@ -265,7 +268,11 @@ struct SleepListView: View {
         guard orchestrator.snapshot?.nextSleepKind == .nap else { return false }
         return nextNapTime < Date()
     }
-
+    // Nap atlandıysa, bir sonraki tahmini napı hesapla
+    private var nextNapAfterMissed: Date {
+        let wakeWindow = orchestrator.snapshot?.daytime.wakeWindowUsed ?? 150
+        return nextNapTime.addingMinutes(wakeWindow)
+    }
     private var wakeWindowBeforeLatest: Int {
         guard let firstNap = todaySleeps
             .filter({ $0.kind == .dayNap })
@@ -365,6 +372,46 @@ struct SleepListView: View {
         let lastNapEnd: Date? = sortedNaps.last.map {
             Calendar.current.date(byAdding: .minute, value: $0.duration, to: $0.date) ?? $0.date
         }
+
+        if isNextNapOverdue {
+            // Geçmiş nap zamanı — turuncu "missed" node göster
+            let awakeBeforeMissed = lastNapEnd.map {
+                max(0, Int(nextNapTime.timeIntervalSince($0) / 60))
+            } ?? max(0, Int(nextNapTime.timeIntervalSince(wakeUp) / 60))
+
+            items.append(TimelineItem(
+                icon: "exclamationmark.triangle.fill",
+                iconColor: .orange,
+                time: shortTime(nextNapTime),
+                title: "Nap missed",
+                detail: "Not logged",
+                isActive: false,
+                isFuture: false,
+                awakeBeforeMinutes: awakeBeforeMissed,
+                isOverdue: true
+            ))
+
+            // Sonraki tahmini napı da ekle
+            let awakeBeforeNext = max(0, Int(nextNapAfterMissed.timeIntervalSince(nextNapTime) / 60))
+            items.append(TimelineItem(
+                icon: "moon.fill",
+                iconColor: .sleepPurple.opacity(0.45),
+                time: "Next nap",
+                title: shortTime(nextNapAfterMissed),
+                detail: "~\(TimeFormat.minutes(orchestrator.snapshot?.daytime.expectedDurationMinutes ?? 90)) expected",
+                isActive: false,
+                isFuture: true,
+                awakeBeforeMinutes: awakeBeforeNext
+            ))
+        } else {
+            let referenceTime = resolveReferenceTime()
+            let awakeBeforeBed = lastNapEnd.map {
+                max(0, Int(referenceTime.timeIntervalSince($0) / 60))
+            } ?? max(0, Int(referenceTime.timeIntervalSince(wakeUp) / 60))
+
+            items.append(nightOrNapTimelineItem(awakeBeforeMinutes: awakeBeforeBed))
+        }
+
 
         let referenceTime = resolveReferenceTime()
         let awakeBeforeBed = lastNapEnd.map {
@@ -929,28 +976,38 @@ struct SleepListView: View {
         VStack(spacing: 5) {
             ZStack {
                 Circle()
-                    .fill(item.iconColor.opacity(item.isFuture ? 0.06 : 0.12))
+                    .fill(item.isOverdue
+                          ? Color.orange.opacity(0.15)
+                          : item.iconColor.opacity(item.isFuture ? 0.06 : 0.12))
                     .frame(width: 34, height: 34)
-                if item.isFuture {
+                if item.isFuture && !item.isOverdue {
                     Circle()
                         .strokeBorder(item.iconColor.opacity(0.5), style: StrokeStyle(lineWidth: 1.5, dash: [3, 3]))
                         .frame(width: 34, height: 34)
                 }
+                if item.isOverdue {
+                    Circle()
+                        .strokeBorder(Color.orange.opacity(0.6), lineWidth: 1.5)
+                        .frame(width: 34, height: 34)
+                }
                 Image(systemName: item.icon)
                     .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(item.iconColor)
+                    .foregroundStyle(item.isOverdue ? .orange : item.iconColor)
             }
             VStack(spacing: 1) {
                 Text(item.time).font(.system(size: 9)).foregroundStyle(.secondary)
-                Text(item.title).font(.system(size: 10, weight: .semibold))
+                Text(item.title)
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(item.isOverdue ? .orange : .primary)
                 if !item.detail.isEmpty {
-                    Text(item.detail).font(.system(size: 9, weight: .semibold)).foregroundStyle(item.iconColor)
+                    Text(item.detail)
+                        .font(.system(size: 9, weight: .semibold))
+                        .foregroundStyle(item.isOverdue ? .orange : item.iconColor)
                 }
             }
         }
         .frame(width: 58)
     }
-
     private func timelineSegment(awakeMinutes: Int, isDashed: Bool) -> some View {
         VStack(spacing: 2) {
             if isDashed {
