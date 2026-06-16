@@ -37,6 +37,7 @@
 		FAAD82D02FDBCE3C00F0FBC6 /* PhaseAgentProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAAD82CF2FDBCE3C00F0FBC6 /* PhaseAgentProtocol.swift */; };
 		FAB4BAFC2FE11F9800702F49 /* ProfileEditSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAB4BAFB2FE11F9700702F49 /* ProfileEditSheet.swift */; };
 		FAB4BAFF2FE1D59700702F49 /* GoogleGenerativeAI in Frameworks */ = {isa = PBXBuildFile; productRef = FAB4BAFE2FE1D59700702F49 /* GoogleGenerativeAI */; };
+		FAB4BB012FE204A200702F49 /* APIConfig.xcconfig in Resources */ = {isa = PBXBuildFile; fileRef = FAB4BB002FE204A200702F49 /* APIConfig.xcconfig */; };
 		FAD9C3722FDBD0CA00A7D9B7 /* PatternAgent.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAD9C3712FDBD0CA00A7D9B7 /* PatternAgent.swift */; };
 		FAD9C3742FDBD14100A7D9B7 /* PatternAgentProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAD9C3732FDBD14100A7D9B7 /* PatternAgentProtocol.swift */; };
 		FAEF10442F4E207F00E76FD4 /* BabySleepTrackerApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAEF10432F4E207F00E76FD4 /* BabySleepTrackerApp.swift */; };
@@ -101,6 +102,8 @@
 		FAAD82CD2FDBCDF100F0FBC6 /* PhaseAgent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhaseAgent.swift; sourceTree = "<group>"; };
 		FAAD82CF2FDBCE3C00F0FBC6 /* PhaseAgentProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhaseAgentProtocol.swift; sourceTree = "<group>"; };
 		FAB4BAFB2FE11F9700702F49 /* ProfileEditSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileEditSheet.swift; sourceTree = "<group>"; };
+		FAB4BB002FE204A200702F49 /* APIConfig.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = APIConfig.xcconfig; sourceTree = "<group>"; };
+		FAB4BB052FE2059000702F49 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		FAD9C3712FDBD0CA00A7D9B7 /* PatternAgent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PatternAgent.swift; sourceTree = "<group>"; };
 		FAD9C3732FDBD14100A7D9B7 /* PatternAgentProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PatternAgentProtocol.swift; sourceTree = "<group>"; };
 		FAEF10402F4E207F00E76FD4 /* BabySleepTracker.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BabySleepTracker.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -216,6 +219,7 @@
 		FAEF10372F4E207F00E76FD4 = {
 			isa = PBXGroup;
 			children = (
+				FAB4BB002FE204A200702F49 /* APIConfig.xcconfig */,
 				FAEF10422F4E207F00E76FD4 /* BabySleepTracker */,
 				FA5488D12FAEB964002BC18B /* BabySleepTrackerTests */,
 				FAEF10412F4E207F00E76FD4 /* Products */,
@@ -234,6 +238,7 @@
 		FAEF10422F4E207F00E76FD4 /* BabySleepTracker */ = {
 			isa = PBXGroup;
 			children = (
+				FAB4BB052FE2059000702F49 /* Info.plist */,
 				FAEF10432F4E207F00E76FD4 /* BabySleepTrackerApp.swift */,
 				FA7232E82FDD8F1E00647487 /* Config */,
 				FA91C5F92FDB4C9C0089E1EE /* Guidelines */,
@@ -369,7 +374,7 @@
 		FAEF10382F4E207F00E76FD4 /* Project object */ = {
 			isa = PBXProject;
 			attributes = {
-				BuildIndependentTargetsInParallel = 1;
+				BuildIndependentTargetsInParallel = YES;
 				LastSwiftUpdateCheck = 1420;
 				LastUpgradeCheck = 1420;
 				TargetAttributes = {
@@ -417,6 +422,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				FAEF104B2F4E208000E76FD4 /* Preview Assets.xcassets in Resources */,
+				FAB4BB012FE204A200702F49 /* APIConfig.xcconfig in Resources */,
 				FAEF10482F4E208000E76FD4 /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -535,6 +541,7 @@
 		};
 		FAEF10512F4E208000E76FD4 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = FAB4BB002FE204A200702F49 /* APIConfig.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				CLANG_ANALYZER_NONNULL = YES;
@@ -595,6 +602,7 @@
 		};
 		FAEF10522F4E208000E76FD4 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = FAB4BB002FE204A200702F49 /* APIConfig.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				CLANG_ANALYZER_NONNULL = YES;
@@ -649,6 +657,7 @@
 		};
 		FAEF10542F4E208000E76FD4 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = FAB4BB002FE204A200702F49 /* APIConfig.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -658,6 +667,7 @@
 				DEVELOPMENT_TEAM = 2GF6Y44N8Z;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = BabySleepTracker/Info.plist;
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "BabySleepTracker needs access to your photo library so you can choose a profile photo for your baby.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -679,6 +689,7 @@
 		};
 		FAEF10552F4E208000E76FD4 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = FAB4BB002FE204A200702F49 /* APIConfig.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -688,6 +699,7 @@
 				DEVELOPMENT_TEAM = 2GF6Y44N8Z;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = BabySleepTracker/Info.plist;
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "BabySleepTracker needs access to your photo library so you can choose a profile photo for your baby.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
