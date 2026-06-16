@@ -256,6 +256,16 @@ struct SleepListView: View {
         return "\(shortTime(start)) – \(shortTime(end))"
     }
 
+    // FIX: Settings'te kaydedilen varsayılan wake time kullanıldı mı?
+    private var usingDefaultWakeTime: Bool {
+        orchestrator.snapshot?.daytime.usedDefaultWakeTime ?? false
+    }
+    
+    private var isNextNapOverdue: Bool {
+        guard orchestrator.snapshot?.nextSleepKind == .nap else { return false }
+        return nextNapTime < Date()
+    }
+
     private var wakeWindowBeforeLatest: Int {
         guard let firstNap = todaySleeps
             .filter({ $0.kind == .dayNap })
@@ -319,6 +329,7 @@ struct SleepListView: View {
             detail: "",
             isActive: false,
             isFuture: false
+            
         ))
 
         // 2. Her nap — aralarında uyanıklık süresi yok, çizgide gösterilecek
@@ -457,6 +468,10 @@ struct SleepListView: View {
                     headerSection
                     totalSleepCard
                     nextNapOrBedtimeCard
+
+                    if usingDefaultWakeTime {
+                        defaultWakeTimeWarningBanner
+                    }
 
                     if orchestrator.snapshot?.nextSleepKind == .nap {
                         bedtimeWindowCard
@@ -619,49 +634,98 @@ struct SleepListView: View {
     
     private var nextNapOrBedtimeCard: some View {
         let isBedtime = orchestrator.snapshot?.nextSleepKind == .bedtime
+        let isOverdue = isNextNapOverdue
         let displayTime = isBedtime
             ? (orchestrator.snapshot?.night.optimalBedtimeStart ?? nextNapTime)
             : nextNapTime
-        let icon = isBedtime ? "moon.stars.fill" : "moon.fill"
-        let label = isBedtime ? "BEDTIME" : "NEXT NAP"
+        let icon = isBedtime ? "moon.stars.fill" : (isOverdue ? "exclamationmark.triangle.fill" : "moon.fill")
+        let label = isBedtime ? "BEDTIME" : (isOverdue ? "NAP WINDOW PASSED" : "NEXT NAP")
+        let accentColor: Color = isOverdue ? .orange : Color.sleepPurpleDeep
+        let backgroundTint: Color = isOverdue ? .orange.opacity(0.12) : Color.sleepPurple.opacity(0.12)
 
         return Button {
-            activeSheet = .addSleep(editing: nil, defaultDate: displayTime)
+            activeSheet = .addSleep(editing: nil, defaultDate: isOverdue ? Date() : displayTime)
         } label: {
             HStack(spacing: 12) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(label)
                         .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(Color.sleepPurpleDeep)
-                    Text(shortTime(displayTime))
+                        .foregroundStyle(accentColor)
+                    Text(isOverdue ? "Add nap now" : shortTime(displayTime))
                         .font(.system(size: 26, weight: .medium, design: .rounded))
                         .foregroundStyle(.primary)
-                    Text("Window: \(recommendationWindow)")
+                    Text(isOverdue
+                         ? "Expected around \(shortTime(displayTime)) — baby may be overtired"
+                         : "Window: \(recommendationWindow)")
                         .font(.system(size: 12))
-                        .foregroundStyle(Color.sleepPurpleDeep.opacity(0.8))
+                        .foregroundStyle(accentColor.opacity(0.8))
                 }
                 Spacer()
                 VStack(spacing: 4) {
                     ZStack {
-                        Circle().fill(Color.sleepPurpleDeep).frame(width: 46, height: 46)
+                        Circle().fill(accentColor).frame(width: 46, height: 46)
                         Image(systemName: icon)
                             .font(.system(size: 20))
                             .foregroundStyle(.white)
                     }
-                    Text("\(confidencePercent)% conf.")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(Color.sleepPurpleDeep)
+                    if !isOverdue {
+                        Text("\(confidencePercent)% conf.")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(accentColor)
+                    }
                 }
             }
             .padding(16)
             .contentShape(Rectangle())
             .background(
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .fill(Color.sleepPurple.opacity(0.12))
+                    .fill(backgroundTint)
             )
         }
         .buttonStyle(CardPressButtonStyle())
     }
+
+    // MARK: Default Wake Time Warning Banner
+
+    private var defaultWakeTimeWarningBanner: some View {
+        Button {
+            activeSheet = .wakeTime
+        } label: {
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.system(size: 13))
+                    .foregroundStyle(.orange)
+                    .padding(.top, 1)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Next nap prediction uses your default wake-up time.")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.primary)
+                    Text("Add today's actual wake-up time for a more accurate prediction.")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+
+                Image(systemName: "chevron.right")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(12)
+            .contentShape(Rectangle())
+            .background(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(Color.orange.opacity(0.10))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke(Color.orange.opacity(0.25), lineWidth: 1)
+            )
+        }
+        .buttonStyle(CardPressButtonStyle())
+    }
+
      // MARK: Bedtime Window Card
     
     @ViewBuilder

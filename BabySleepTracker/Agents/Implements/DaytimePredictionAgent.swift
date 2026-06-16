@@ -11,6 +11,7 @@ struct DaytimePrediction {
     let confidence:              Int      // 0–94
     let mode:                    PredictionMode
     let reasoning:               [String]
+    let usedDefaultWakeTime:     Bool     // FIX: UI uyarısı için
 }
 
 enum PredictionMode {
@@ -61,7 +62,6 @@ final class DefaultDaytimePredictionAgent: DaytimePredictionAgentProtocol {
         let profile  = profileProvider.profile(forAgeMonths: ageMonths)
         let breaks   = todayRecords.filter { $0.kind == .break }
 
-        // Ongoing nap varsa ayrı tut — tamamlanmış naplar anchor için kullanılır
         let todayNaps = todayRecords
             .filter { $0.kind == .dayNap && !$0.isOngoing }
             .sorted { $0.date < $1.date }
@@ -128,7 +128,8 @@ final class DefaultDaytimePredictionAgent: DaytimePredictionAgentProtocol {
             wakeWindowUsed:          wakeWindow,
             confidence:              confidence,
             mode:                    mode,
-            reasoning:               reasoning
+            reasoning:               reasoning,
+            usedDefaultWakeTime:     !anchor.hasTodayWakeTime
         )
     }
 
@@ -142,24 +143,22 @@ final class DefaultDaytimePredictionAgent: DaytimePredictionAgentProtocol {
         now:         Date
     ) -> (time: Date, hasTodayWakeTime: Bool) {
 
-        // FIX 2: Ongoing nap — bebek hâlâ uyuyor
-        // Tahmini bitiş = başlangıç + max(45 dk, şimdiye kadar geçen süre + 30 dk)
+        // Ongoing nap — bebek hâlâ uyuyor
         if let ongoing = ongoingNap {
-            let elapsed          = max(0, Int(now.timeIntervalSince(ongoing.date) / 60))
-            let estimatedEnd     = ongoing.date.addingMinutes(max(45, elapsed + 30))
-            let anchorTime       = estimatedEnd > now ? estimatedEnd : now
+            let elapsed      = max(0, Int(now.timeIntervalSince(ongoing.date) / 60))
+            let estimatedEnd = ongoing.date.addingMinutes(max(45, elapsed + 30))
+            let anchorTime   = estimatedEnd > now ? estimatedEnd : now
             return (anchorTime, true)
         }
 
         // Tamamlanmış son napın net bitiş saati
         if let lastNap = todayNaps.last {
             let net      = lastNap.totalMinutes(breaks: breaks)
-            let duration = net > 0 ? net : lastNap.duration   // sıfır gelirse ham süreye dön
+            let duration = net > 0 ? net : lastNap.duration
             return (lastNap.date.addingMinutes(duration), true)
         }
 
-        // FIX 3: Aynı gün birden fazla wake record olabilir
-        // En geç wake time'ı kullan (en son güncellenen)
+        // Bugünün wake record'u — en son girileni kullan
         let todayWakes = wakeRecords
             .filter { calendar.isDate($0.day, inSameDayAs: now) }
             .sorted { $0.wakeTime < $1.wakeTime }
@@ -168,19 +167,24 @@ final class DefaultDaytimePredictionAgent: DaytimePredictionAgentProtocol {
             return (latestWake.wakeTime, true)
         }
 
-        // Fallback: gece 00:00–07:00 arası → sabah 07:00, sonrası → now
-        // Fallback: gece 00:00–07:00 arası → kullanıcının typical wake time'ı, sonrası → now
+        // FIX: Hiç kayıt yoksa — Settings'te kaydedilen "typical wake time"ı kullan
+        // Bu artık GERÇEK kayıt değil, varsayım — hasTodayWakeTime = false döner
+        // ki UI'da "varsayılan kullanıldı" uyarısı gösterilebilsin
         let today = calendar.startOfDay(for: now)
 
         let wakeHour   = UserDefaults.standard.object(forKey: "typicalWakeHour")   as? Double ?? 7.0
         let wakeMinute = UserDefaults.standard.object(forKey: "typicalWakeMinute") as? Double ?? 0.0
 
         let typicalWake = calendar.date(
-            bySettingHour: Int(wakeHour), minute: Int(wakeMinute), second: 0, of: today
+            bySettingHour: Int(wakeHour),
+            minute:        Int(wakeMinute),
+            second:        0,
+            of:            today
         ) ?? now
 
+        // Henüz typical wake time geçmediyse onu kullan, geçtiyse now anchor
         let fallback = now >= typicalWake ? now : typicalWake
-        return (fallback, false)
+        return (fallback, false)   // false = bu gerçek bir kayıt değil, varsayım
     }
 
     // MARK: - Blended Wake Window
@@ -259,7 +263,6 @@ final class DefaultDaytimePredictionAgent: DaytimePredictionAgentProtocol {
         }
         if hasWakeTime    { score += 8 }
         if hasPattern     { score += 5 }
-        // Ongoing nap bitiş zamanı belirsiz — güven düşer
         if hasOngoingNap  { score -= 10 }
         return min(max(score, 0), 94)
     }
@@ -281,7 +284,7 @@ final class DefaultDaytimePredictionAgent: DaytimePredictionAgentProtocol {
         } else if anchor.hasTodayWakeTime {
             parts.append("Calculated from today's wake-up or last nap end time.")
         } else {
-            parts.append("No wake time recorded — defaulted to 7:00 AM. Adding it improves accuracy.")
+            parts.append("No wake time logged today — using your saved typical wake-up time as a default.")
         }
 
         switch mode {
@@ -307,5 +310,4 @@ final class DefaultDaytimePredictionAgent: DaytimePredictionAgentProtocol {
         return name.isEmpty ? "Baby" : name
     }
 }
-
 
