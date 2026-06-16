@@ -263,6 +263,7 @@ struct SleepListView: View {
     private var usingDefaultWakeTime: Bool {
         orchestrator.snapshot?.daytime.usedDefaultWakeTime ?? false
     }
+ 
     
     private var isNextNapOverdue: Bool {
         guard orchestrator.snapshot?.nextSleepKind == .nap else { return false }
@@ -306,135 +307,142 @@ struct SleepListView: View {
             ?? "Start with one sleep session and your baby's wake window will become easier to predict."
     }
 
-    // MARK: - Timeline Items
+    // MARK: - Expected Nap Slots Helper
 
-    private var timelineItems: [TimelineItem] {
-        var items: [TimelineItem] = []
+        private var expectedNapSlotCount: Int {
+            guard let ageMonths = orchestrator.snapshot?.ageMonths else { return 2 }
+            let profile = DefaultAgeBasedSleepProfileProvider().profile(forAgeMonths: ageMonths)
+            return profile.expectedNapCount.upperBound
+        }
 
-        let sortedNaps = todaySleeps
-            .filter { $0.kind == .dayNap }
-            .sorted { $0.date < $1.date }
+        private var timelineItems: [TimelineItem] {
+            var items: [TimelineItem] = []
 
-        // 1. Wake up — sadece günün başlangıcı
-        let wakeUp: Date = {
-            if let wt = todayWakeRecord?.wakeTime { return wt }
-            if let first = sortedNaps.first {
-                return Calendar.current.date(
-                    byAdding: .minute,
-                    value: -wakeWindowBeforeLatest,
-                    to: first.date
-                ) ?? first.date
-            }
-            return defaultWakeTime
-        }()
+            let sortedNaps = todaySleeps
+                .filter { $0.kind == .dayNap }
+                .sorted { $0.date < $1.date }
 
-        items.append(TimelineItem(
-            icon: "sun.max.fill",
-            iconColor: .orange,   // ← sleepSun yerine .orange
-            time: shortTime(wakeUp),
-            title: "Wake up",
-            detail: "",
-            isActive: false,
-            isFuture: false
-        ))
-
-        // 2. Her nap — aralarında uyanıklık süresi yok, çizgide gösterilecek
-        for (index, nap) in sortedNaps.enumerated() {
-            let napEnd = Calendar.current.date(
-                byAdding: .minute, value: nap.duration, to: nap.date
-            ) ?? nap.date
-
-            // Bir önceki bitiş saati (ilk nap için wake up)
-            let prevEnd: Date = {
-                if index == 0 { return wakeUp }
-                let prev = sortedNaps[index - 1]
-                return Calendar.current.date(
-                    byAdding: .minute, value: prev.duration, to: prev.date
-                ) ?? prev.date
+            // 1. Wake up
+            let wakeUp: Date = {
+                if let wt = todayWakeRecord?.wakeTime { return wt }
+                if let first = sortedNaps.first {
+                    return Calendar.current.date(
+                        byAdding: .minute,
+                        value: -wakeWindowBeforeLatest,
+                        to: first.date
+                    ) ?? first.date
+                }
+                return defaultWakeTime
             }()
 
-            let awakeBeforeNap = max(0, Int(nap.date.timeIntervalSince(prevEnd) / 60))
-
             items.append(TimelineItem(
-                icon: "moon.fill",
-                iconColor: .sleepPurple,
-                time: shortTime(nap.date),
-                title: "Nap \(index + 1)",
-                detail: TimeFormat.minutes(nap.totalMinutes(breaks: breaks)),
-                isActive: index == sortedNaps.count - 1,
-                isFuture: false,
-                awakeBeforeMinutes: awakeBeforeNap
-            ))
-        }
-
-        // 3. Bedtime veya next nap
-        let lastNapEnd: Date? = sortedNaps.last.map {
-            Calendar.current.date(byAdding: .minute, value: $0.duration, to: $0.date) ?? $0.date
-        }
-
-        if isNextNapOverdue {
-            // Geçmiş nap zamanı — turuncu "missed" node göster
-            let awakeBeforeMissed = lastNapEnd.map {
-                max(0, Int(nextNapTime.timeIntervalSince($0) / 60))
-            } ?? max(0, Int(nextNapTime.timeIntervalSince(wakeUp) / 60))
-
-            items.append(TimelineItem(
-                icon: "exclamationmark.triangle.fill",
+                icon: "sun.max.fill",
                 iconColor: .orange,
-                time: shortTime(nextNapTime),
-                title: "Nap missed",
-                detail: "Not logged",
+                time: shortTime(wakeUp),
+                title: "Wake up",
+                detail: "",
                 isActive: false,
-                isFuture: false,
-                awakeBeforeMinutes: awakeBeforeMissed,
-                isOverdue: true
+                isFuture: false
             ))
 
-            // Sonraki tahmini napı da ekle
-            let awakeBeforeNext = max(0, Int(nextNapAfterMissed.timeIntervalSince(nextNapTime) / 60))
-            items.append(TimelineItem(
-                icon: "moon.fill",
-                iconColor: .sleepPurple.opacity(0.45),
-                time: "Next nap",
-                title: shortTime(nextNapAfterMissed),
-                detail: "~\(TimeFormat.minutes(orchestrator.snapshot?.daytime.expectedDurationMinutes ?? 90)) expected",
-                isActive: false,
-                isFuture: true,
-                awakeBeforeMinutes: awakeBeforeNext
-            ))
-        } else {
-            let referenceTime = resolveReferenceTime()
-            let awakeBeforeBed = lastNapEnd.map {
-                max(0, Int(referenceTime.timeIntervalSince($0) / 60))
-            } ?? max(0, Int(referenceTime.timeIntervalSince(wakeUp) / 60))
+            // 2. Gerçek (loglanmış) naplar
+            var lastEnd = wakeUp
+            for (index, nap) in sortedNaps.enumerated() {
+                let napEnd = Calendar.current.date(
+                    byAdding: .minute, value: nap.duration, to: nap.date
+                ) ?? nap.date
 
-            items.append(nightOrNapTimelineItem(awakeBeforeMinutes: awakeBeforeBed))
-        }
+                let awakeBeforeNap = max(0, Int(nap.date.timeIntervalSince(lastEnd) / 60))
 
+                items.append(TimelineItem(
+                    icon: "moon.fill",
+                    iconColor: .sleepPurple,
+                    time: shortTime(nap.date),
+                    title: "Nap \(index + 1)",
+                    detail: TimeFormat.minutes(nap.totalMinutes(breaks: breaks)),
+                    isActive: index == sortedNaps.count - 1,
+                    isFuture: false,
+                    awakeBeforeMinutes: awakeBeforeNap
+                ))
 
-        let referenceTime = resolveReferenceTime()
-        let awakeBeforeBed = lastNapEnd.map {
-            max(0, Int(referenceTime.timeIntervalSince($0) / 60))
-        } ?? max(0, Int(referenceTime.timeIntervalSince(wakeUp) / 60))
-
-        items.append(nightOrNapTimelineItem(awakeBeforeMinutes: awakeBeforeBed))
-
-        // Max 4 item — fazlaysa ilk + son 2 nap + bedtime
-        if items.count > 4 {
-            let first   = items[0]                    // Wake up
-            let prelast = items[items.count - 2]      // Son nap
-            let last    = items[items.count - 1]      // Bedtime
-            // İkinci son napı da göster
-            if items.count >= 4 {
-                let secondLast = items[items.count - 3]
-                return [first, secondLast, prelast, last]
+                lastEnd = napEnd
             }
-            return [first, prelast, last]
-        }
 
-        return items
+            // 3. Kalan tahmini nap slotları — günün toplam beklenen nap sayısına ulaşana kadar
+            let totalSlots = expectedNapSlotCount
+            let remainingSlots = max(0, totalSlots - sortedNaps.count)
+            var predictedAnchor = lastEnd
+            let wakeWindow = orchestrator.snapshot?.daytime.wakeWindowUsed ?? 180
+            let expectedDuration = orchestrator.snapshot?.daytime.expectedDurationMinutes ?? 90
+
+            for slot in 0..<remainingSlots {
+                // İlk tahmini slot gerçek "next nap" tahminini kullanır (daha hassas, anchor mantığı doğru)
+                let predictedStart: Date
+                if slot == 0 {
+                    predictedStart = nextNapTime
+                } else {
+                    predictedStart = predictedAnchor.addingMinutes(wakeWindow)
+                }
+
+                let awakeBefore = max(0, Int(predictedStart.timeIntervalSince(predictedAnchor) / 60))
+
+                items.append(TimelineItem(
+                    icon: "moon.fill",
+                    iconColor: .sleepPurple.opacity(0.45),
+                    time: shortTime(predictedStart),
+                    title: "Nap \(sortedNaps.count + slot + 1)",
+                    detail: "~\(TimeFormat.minutes(expectedDuration)) expected",
+                    isActive: false,
+                    isFuture: true,
+                    awakeBeforeMinutes: awakeBefore
+                ))
+
+                predictedAnchor = predictedStart.addingMinutes(expectedDuration)
+            }
+
+            // 4. Bedtime — sadece toplam item sayısı 4'ü aşmıyorsa ekle
+            if items.count < 4 {
+                let bedtime = orchestrator.snapshot?.night.optimalBedtimeStart
+                    ?? predictedAnchor.addingMinutes(wakeWindow)
+                let awakeBeforeBed = max(0, Int(bedtime.timeIntervalSince(predictedAnchor) / 60))
+
+                items.append(TimelineItem(
+                    icon: "moon.stars.fill",
+                    iconColor: .sleepPurpleDeep.opacity(0.6),
+                    time: "Bedtime",
+                    title: shortTime(bedtime),
+                    detail: "Night sleep",
+                    isActive: false,
+                    isFuture: true,
+                    awakeBeforeMinutes: awakeBeforeBed
+                ))
+            }
+
+            // Güvenlik: 4'ü aşarsa kırp (ör. expectedNapSlotCount 3 ve hepsi loglanmışsa tam 4 olur, sorun yok;
+            // ama olası edge-case'lerde son 4'ü göster)
+            if items.count > 4 {
+                return Array(items.suffix(4))
+            }
+
+            return items
+        }
+    
+    // 10 aylık bebek için expectedNapCount.upperBound = 2 gibi
+    private var expectedNapCountUpperBound: Int {
+        guard let ageMonths = orchestrator.snapshot?.ageMonths else { return 2 }
+        let profile = DefaultAgeBasedSleepProfileProvider().profile(forAgeMonths: ageMonths)
+        return profile.expectedNapCount.upperBound
     }
 
+    private var completedNapCountToday: Int {
+        todaySleeps.filter { $0.kind == .dayNap }.count
+    }
+
+    // Tahmin edilen "kayıp/sıradaki" nap, günün son napı mı?
+    private var isThisTheLastExpectedNap: Bool {
+        completedNapCountToday + 1 >= expectedNapCountUpperBound
+    }
+    
     private func resolveReferenceTime() -> Date {
         if orchestrator.snapshot?.nextSleepKind == .bedtime {
             return orchestrator.snapshot?.night.optimalBedtimeStart ?? nextNapTime
@@ -676,60 +684,125 @@ struct SleepListView: View {
         )
     }
     
-    // MARK: next nap or bedtime?
-    
-    private var nextNapOrBedtimeCard: some View {
-        let isBedtime = orchestrator.snapshot?.nextSleepKind == .bedtime
-        let isOverdue = isNextNapOverdue
-        let displayTime = isBedtime
-            ? (orchestrator.snapshot?.night.optimalBedtimeStart ?? nextNapTime)
-            : nextNapTime
-        let icon = isBedtime ? "moon.stars.fill" : (isOverdue ? "exclamationmark.triangle.fill" : "moon.fill")
-        let label = isBedtime ? "BEDTIME" : (isOverdue ? "NAP WINDOW PASSED" : "NEXT NAP")
-        let accentColor: Color = isOverdue ? .orange : Color.sleepPurpleDeep
-        let backgroundTint: Color = isOverdue ? .orange.opacity(0.12) : Color.sleepPurple.opacity(0.12)
+    // Henüz typical wake time gelmediyse ve bugün hiç kayıt yoksa, bebek hâlâ gece uykusunda kabul edilir
+        private var isStillInNightSleep: Bool {
+            guard todayWakeRecord == nil, todaySleeps.isEmpty else { return false }
 
-        return Button {
-            activeSheet = .addSleep(editing: nil, defaultDate: isOverdue ? Date() : displayTime)
-        } label: {
+            let wakeHour   = UserDefaults.standard.object(forKey: "typicalWakeHour")   as? Double ?? 7.0
+            let wakeMinute = UserDefaults.standard.object(forKey: "typicalWakeMinute") as? Double ?? 0.0
+
+            let today = Calendar.current.startOfDay(for: Date())
+            let typicalWake = Calendar.current.date(
+                bySettingHour: Int(wakeHour), minute: Int(wakeMinute), second: 0, of: today
+            ) ?? Date()
+
+            return Date() < typicalWake
+        }
+
+        // MARK: next nap or bedtime?
+
+        @ViewBuilder
+        private var nextNapOrBedtimeCard: some View {
+            if isStillInNightSleep {
+                stillSleepingCard
+            } else {
+                regularNextNapOrBedtimeCard
+            }
+        }
+
+        // MARK: Still Sleeping Card (gece, henüz wake time gelmedi)
+
+        private var stillSleepingCard: some View {
             HStack(spacing: 12) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(label)
+                    Text("STILL ASLEEP")
                         .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(accentColor)
-                    Text(isOverdue ? "Add nap now" : shortTime(displayTime))
+                        .foregroundStyle(Color.sleepPurpleDeep)
+                    Text("Sleeping")
                         .font(.system(size: 26, weight: .medium, design: .rounded))
                         .foregroundStyle(.primary)
-                    Text(isOverdue
-                         ? "Expected around \(shortTime(displayTime)) — baby may be overtired"
-                         : "Window: \(recommendationWindow)")
+                    Text("Expected to wake around \(shortTime(typicalWakeDate))")
                         .font(.system(size: 12))
-                        .foregroundStyle(accentColor.opacity(0.8))
+                        .foregroundStyle(Color.sleepPurpleDeep.opacity(0.8))
                 }
                 Spacer()
-                VStack(spacing: 4) {
-                    ZStack {
-                        Circle().fill(accentColor).frame(width: 46, height: 46)
-                        Image(systemName: icon)
-                            .font(.system(size: 20))
-                            .foregroundStyle(.white)
-                    }
-                    if !isOverdue {
-                        Text("\(confidencePercent)% conf.")
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(accentColor)
-                    }
+                ZStack {
+                    Circle().fill(Color.sleepPurpleDeep).frame(width: 46, height: 46)
+                    Image(systemName: "moon.zzz.fill")
+                        .font(.system(size: 20))
+                        .foregroundStyle(.white)
                 }
             }
             .padding(16)
-            .contentShape(Rectangle())
             .background(
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .fill(backgroundTint)
+                    .fill(Color.sleepPurple.opacity(0.12))
             )
         }
-        .buttonStyle(CardPressButtonStyle())
-    }
+
+        private var typicalWakeDate: Date {
+            let wakeHour   = UserDefaults.standard.object(forKey: "typicalWakeHour")   as? Double ?? 7.0
+            let wakeMinute = UserDefaults.standard.object(forKey: "typicalWakeMinute") as? Double ?? 0.0
+            let today = Calendar.current.startOfDay(for: Date())
+            return Calendar.current.date(
+                bySettingHour: Int(wakeHour), minute: Int(wakeMinute), second: 0, of: today
+            ) ?? Date()
+        }
+
+        // MARK: Regular Next Nap / Bedtime Card (mevcut mantık aynen)
+
+        private var regularNextNapOrBedtimeCard: some View {
+            let isBedtime = orchestrator.snapshot?.nextSleepKind == .bedtime
+            let isOverdue = isNextNapOverdue
+            let displayTime = isBedtime
+                ? (orchestrator.snapshot?.night.optimalBedtimeStart ?? nextNapTime)
+                : nextNapTime
+            let icon = isBedtime ? "moon.stars.fill" : (isOverdue ? "exclamationmark.triangle.fill" : "moon.fill")
+            let label = isBedtime ? "BEDTIME" : (isOverdue ? "NAP WINDOW PASSED" : "NEXT NAP")
+            let accentColor: Color = isOverdue ? .orange : Color.sleepPurpleDeep
+            let backgroundTint: Color = isOverdue ? .orange.opacity(0.12) : Color.sleepPurple.opacity(0.12)
+
+            return Button {
+                activeSheet = .addSleep(editing: nil, defaultDate: isOverdue ? Date() : displayTime)
+            } label: {
+                HStack(spacing: 12) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(label)
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(accentColor)
+                        Text(isOverdue ? "Add nap now" : shortTime(displayTime))
+                            .font(.system(size: 26, weight: .medium, design: .rounded))
+                            .foregroundStyle(.primary)
+                        Text(isOverdue
+                             ? "Expected around \(shortTime(displayTime)) — baby may be overtired"
+                             : "Window: \(recommendationWindow)")
+                            .font(.system(size: 12))
+                            .foregroundStyle(accentColor.opacity(0.8))
+                    }
+                    Spacer()
+                    VStack(spacing: 4) {
+                        ZStack {
+                            Circle().fill(accentColor).frame(width: 46, height: 46)
+                            Image(systemName: icon)
+                                .font(.system(size: 20))
+                                .foregroundStyle(.white)
+                        }
+                        if !isOverdue {
+                            Text("\(confidencePercent)% conf.")
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundStyle(accentColor)
+                        }
+                    }
+                }
+                .padding(16)
+                .contentShape(Rectangle())
+                .background(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(backgroundTint)
+                )
+            }
+            .buttonStyle(CardPressButtonStyle())
+        }
 
     // MARK: Default Wake Time Warning Banner
 
@@ -922,55 +995,69 @@ struct SleepListView: View {
         .buttonStyle(.plain)
     }
     
-
     // MARK: - Timeline Card
 
-    private var todayTimelineCard: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            HStack {
-                Text("Today's Timeline")
-                    .font(.system(size: 20, weight: .bold, design: .rounded))
-                    .foregroundStyle(Color.sleepInk)
-                Spacer()
-                Button {
-                    activeSheet = .dayDetail(SelectedDay(day: Date()))
-                } label: {
+        private var todayTimelineCard: some View {
+            VStack(alignment: .leading, spacing: 18) {
+                HStack {
+                    Text(isStillInNightSleep ? "Plan for Today" : "Today's Timeline")
+                        .font(.system(size: 20, weight: .bold, design: .rounded))
+                        .foregroundStyle(Color.sleepInk)
+                    Spacer()
+                    Button {
+                        activeSheet = .dayDetail(SelectedDay(day: Date()))
+                    } label: {
+                        HStack(spacing: 7) {
+                            Text("View full timeline")
+                                .font(.system(size: 13, weight: .bold))
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 13, weight: .bold))
+                        }
+                        .foregroundStyle(Color.sleepPurpleDeep)
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                if isStillInNightSleep {
                     HStack(spacing: 7) {
-                        Text("View full timeline")
-                            .font(.system(size: 13, weight: .bold))
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 13, weight: .bold))
+                        Image(systemName: "sparkles")
+                            .foregroundStyle(Color.sleepPurpleDeep)
+                        Text("The plan adjusts as the day goes on. Predictions refresh after every new record.")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(Color.sleepMuted)
                     }
-                    .foregroundStyle(Color.sleepPurpleDeep)
+                    .padding(10)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .fill(Color.sleepPurple.opacity(0.06))
+                    )
                 }
-                .buttonStyle(.plain)
-            }
 
-            HStack(alignment: .top, spacing: 0) {
-                ForEach(Array(timelineItems.enumerated()), id: \.element.id) { index, item in
-                    timelineNode(item)
+                HStack(alignment: .top, spacing: 0) {
+                    ForEach(Array(timelineItems.enumerated()), id: \.element.id) { index, item in
+                        timelineNode(item)
 
-                    if index < timelineItems.count - 1 {
-                        timelineSegment(
-                            awakeMinutes: timelineItems[index + 1].awakeBeforeMinutes,
-                            isDashed: timelineItems[index + 1].isFuture
-                        )
+                        if index < timelineItems.count - 1 {
+                            timelineSegment(
+                                awakeMinutes: timelineItems[index + 1].awakeBeforeMinutes,
+                                isDashed: timelineItems[index + 1].isFuture
+                            )
+                        }
                     }
                 }
             }
+            .padding(18)
+            .background(
+                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    .fill(Color(.systemBackground))
+                    .shadow(color: Color.sleepInk.opacity(0.05), radius: 16, x: 0, y: 8)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    .stroke(Color.sleepStroke, lineWidth: 1)
+            )
         }
-        .padding(18)
-        .background(
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .fill(Color(.systemBackground))
-                .shadow(color: Color.sleepInk.opacity(0.05), radius: 16, x: 0, y: 8)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .stroke(Color.sleepStroke, lineWidth: 1)
-        )
-    }
-
     private func timelineNode(_ item: TimelineItem) -> some View {
         VStack(spacing: 5) {
             ZStack {
@@ -1015,7 +1102,7 @@ struct SleepListView: View {
                     .frame(height: 1.5)
                     .overlay(
                         Rectangle()
-                            .strokeBorder(Color.sleepStroke, style: StrokeStyle(lineWidth: 1.5, dash: [4, 3]))
+                            .strokeBorder(Color.sleepStroke.opacity(0.8), style: StrokeStyle(lineWidth: 1.5, dash: [4, 3]))
                     )
             } else {
                 Rectangle()
@@ -1030,7 +1117,6 @@ struct SleepListView: View {
         .frame(maxWidth: .infinity)
         .padding(.top, 17)
     }
-
     private func timelineColumn(_ item: TimelineItem) -> some View {
         ZStack(alignment: .top) {
 

@@ -36,6 +36,7 @@
 		FAAD82CE2FDBCDF100F0FBC6 /* PhaseAgent.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAAD82CD2FDBCDF100F0FBC6 /* PhaseAgent.swift */; };
 		FAAD82D02FDBCE3C00F0FBC6 /* PhaseAgentProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAAD82CF2FDBCE3C00F0FBC6 /* PhaseAgentProtocol.swift */; };
 		FAB4BAFC2FE11F9800702F49 /* ProfileEditSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAB4BAFB2FE11F9700702F49 /* ProfileEditSheet.swift */; };
+		FAB4BAFF2FE1D59700702F49 /* GoogleGenerativeAI in Frameworks */ = {isa = PBXBuildFile; productRef = FAB4BAFE2FE1D59700702F49 /* GoogleGenerativeAI */; };
 		FAD9C3722FDBD0CA00A7D9B7 /* PatternAgent.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAD9C3712FDBD0CA00A7D9B7 /* PatternAgent.swift */; };
 		FAD9C3742FDBD14100A7D9B7 /* PatternAgentProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAD9C3732FDBD14100A7D9B7 /* PatternAgentProtocol.swift */; };
 		FAEF10442F4E207F00E76FD4 /* BabySleepTrackerApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAEF10432F4E207F00E76FD4 /* BabySleepTrackerApp.swift */; };
@@ -136,6 +137,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				FAB4BAFF2FE1D59700702F49 /* GoogleGenerativeAI in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -214,10 +216,6 @@
 		FAEF10372F4E207F00E76FD4 = {
 			isa = PBXGroup;
 			children = (
-				FAB4BAFB2FE11F9700702F49 /* ProfileEditSheet.swift */,
-				FA7232E62FDD8D6D00647487 /* SleepCoachLLMAgent.swift */,
-				FA7232E42FDCCD6000647487 /* SleepCoachOrchestrator.swift */,
-				FA7232E22FDCCC6500647487 /* Date+Extensions.swift */,
 				FAEF10422F4E207F00E76FD4 /* BabySleepTracker */,
 				FA5488D12FAEB964002BC18B /* BabySleepTrackerTests */,
 				FAEF10412F4E207F00E76FD4 /* Products */,
@@ -275,6 +273,7 @@
 			isa = PBXGroup;
 			children = (
 				FA9DB0A82FD49ED4000B9211 /* CreateAccountView.swift */,
+				FAB4BAFB2FE11F9700702F49 /* ProfileEditSheet.swift */,
 				FA9DB0A42FD49E91000B9211 /* LandingView.swift */,
 				FA9DB0A22FD49E6B000B9211 /* LoginView.swift */,
 				FA9DB09E2FD44B3F000B9211 /* SettingView.swift */,
@@ -305,6 +304,8 @@
 			isa = PBXGroup;
 			children = (
 				FAEF20012FDE000100E76FD4 /* SleepCoachArchitecture.swift */,
+				FA7232E62FDD8D6D00647487 /* SleepCoachLLMAgent.swift */,
+				FA7232E42FDCCD6000647487 /* SleepCoachOrchestrator.swift */,
 				FA9DB0A62FD49EB9000B9211 /* AuthFlow.swift */,
 				FA5488CA2FAEB831002BC18B /* SleepAPI.swift */,
 				FAEF104C2F4E208000E76FD4 /* SleepStore.swift */,
@@ -315,6 +316,7 @@
 		FAEF10622F4E26DA00E76FD4 /* Utils */ = {
 			isa = PBXGroup;
 			children = (
+				FA7232E22FDCCC6500647487 /* Date+Extensions.swift */,
 				FAEF105C2F4E212F00E76FD4 /* TimeFormat.swift */,
 			);
 			path = Utils;
@@ -354,6 +356,9 @@
 			dependencies = (
 			);
 			name = BabySleepTracker;
+			packageProductDependencies = (
+				FAB4BAFE2FE1D59700702F49 /* GoogleGenerativeAI */,
+			);
 			productName = BabySleepTracker;
 			productReference = FAEF10402F4E207F00E76FD4 /* BabySleepTracker.app */;
 			productType = "com.apple.product-type.application";
@@ -386,6 +391,9 @@
 				Base,
 			);
 			mainGroup = FAEF10372F4E207F00E76FD4;
+			packageReferences = (
+				FAB4BAFD2FE1D59700702F49 /* XCRemoteSwiftPackageReference "generative-ai-swift" */,
+			);
 			productRefGroup = FAEF10412F4E207F00E76FD4 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -730,6 +738,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		FAB4BAFD2FE1D59700702F49 /* XCRemoteSwiftPackageReference "generative-ai-swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/google/generative-ai-swift";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.5.6;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		FAB4BAFE2FE1D59700702F49 /* GoogleGenerativeAI */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = FAB4BAFD2FE1D59700702F49 /* XCRemoteSwiftPackageReference "generative-ai-swift" */;
+			productName = GoogleGenerativeAI;
+		};
+/* End XCSwiftPackageProductDependency section */
 
 /* Begin XCVersionGroup section */
 		FAEF104E2F4E208000E76FD4 /* BabySleepTracker.xcdatamodeld */ = {

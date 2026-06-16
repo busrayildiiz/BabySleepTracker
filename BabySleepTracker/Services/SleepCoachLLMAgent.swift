@@ -3,8 +3,10 @@
 //  BabySleepTracker
 //
 //  Created by MacBook on 13.06.2026.
+//
 
 import Foundation
+import GoogleGenerativeAI
 
 // MARK: - LLM Response
 
@@ -41,7 +43,16 @@ protocol SleepCoachLLMAgentProtocol {
 
 final class DefaultSleepCoachLLMAgent: SleepCoachLLMAgentProtocol {
 
-    private let apiURL = URL(string: "https://api.anthropic.com/v1/messages")!
+    private let model: GenerativeModel
+
+    init() {
+        // Ücretsiz ve hızlı olan gemini-1.5-flash modelini kullanıyoruz.
+        // Key, APIConfig.swift üzerinden okunuyor.
+        self.model = GenerativeModel(
+            name: "gemini-2.5-flash",
+            apiKey: APIConfig.geminiKey
+        )
+    }
 
     // MARK: - Generate Insight
 
@@ -51,9 +62,29 @@ final class DefaultSleepCoachLLMAgent: SleepCoachLLMAgentProtocol {
         trigger:  LLMTrigger
     ) async -> LLMCoachResponse? {
 
-        let prompt  = buildPrompt(snapshot: snapshot, records: records, trigger: trigger)
-        let rawJSON = await callAPI(prompt: prompt)
-        return parseResponse(rawJSON)
+        // Key hâlâ placeholder ise çağrı yapmadan çık — gereksiz hata/log önler
+        guard APIConfig.geminiKey != "BURAYA_KENDI_GEMINI_API_KEYINI_YAPISTIR",
+              !APIConfig.geminiKey.isEmpty else {
+            print("⚠️ Gemini API key tanımlı değil. APIConfig.swift dosyasını kontrol et.")
+            return nil
+        }
+
+        let prompt = buildPrompt(snapshot: snapshot, records: records, trigger: trigger)
+
+        do {
+            let response = try await model.generateContent(prompt)
+
+            guard let responseText = response.text else {
+                print("LLM Error: Boş yanıt döndü.")
+                return nil
+            }
+
+            return parseResponse(responseText)
+
+        } catch {
+            print("Gemini API Error: \(error.localizedDescription)")
+            return nil
+        }
     }
 
     // MARK: - Prompt Builder
@@ -71,16 +102,13 @@ final class DefaultSleepCoachLLMAgent: SleepCoachLLMAgentProtocol {
         let breaks  = records.filter { $0.kind == .break }
         let dayNaps = records.filter { $0.kind == .dayNap }
 
-        // Son 7 günün özeti
         let last7Summary = buildLast7DaysSummary(
             dayNaps: dayNaps,
             breaks:  breaks
         )
 
-        // Trigger açıklaması
         let triggerContext = describeTrigger(trigger)
 
-        // Phase açıklaması
         let phaseDescription: String
         switch snapshot.phase {
         case .tooYoung:           phaseDescription = "Baby is under 4 months, no pattern expected."
@@ -89,7 +117,6 @@ final class DefaultSleepCoachLLMAgent: SleepCoachLLMAgentProtocol {
         case .personalized:       phaseDescription = "Personalized mode — 14+ days of data."
         }
 
-        // Nap transition durumu
         let transitionNote: String
         switch snapshot.transition.signalStrength {
         case .none:     transitionNote = "No transition signals."
@@ -209,55 +236,10 @@ final class DefaultSleepCoachLLMAgent: SleepCoachLLMAgentProtocol {
         return lines.joined(separator: "\n")
     }
 
-    // MARK: - API Call
-
-    private func callAPI(prompt: String) async -> [String: Any]? {
-        var request         = URLRequest(url: apiURL)
-        request.httpMethod  = "POST"
-        request.setValue("application/json",          forHTTPHeaderField: "Content-Type")
-        request.setValue("2023-06-01",                forHTTPHeaderField: "anthropic-version")
-        request.setValue(APIConfig.anthropicKey, forHTTPHeaderField: "x-api-key")
-
-        let body: [String: Any] = [
-            "model":      "claude-sonnet-4-6",
-            "max_tokens": 600,
-            "messages": [
-                ["role": "user", "content": prompt]
-            ]
-        ]
-
-        guard let httpBody = try? JSONSerialization.data(withJSONObject: body) else {
-            return nil
-        }
-        request.httpBody = httpBody
-
-        do {
-            let (data, response) = try await URLSession.shared.data(for: request)
-
-            guard let httpResponse = response as? HTTPURLResponse,
-                  httpResponse.statusCode == 200 else {
-                return nil
-            }
-
-            return try JSONSerialization.jsonObject(with: data) as? [String: Any]
-
-        } catch {
-            print("LLM API error: \(error.localizedDescription)")
-            return nil
-        }
-    }
-
     // MARK: - Response Parser
 
-    private func parseResponse(_ json: [String: Any]?) -> LLMCoachResponse? {
-        guard
-            let json,
-            let content = json["content"] as? [[String: Any]],
-            let firstBlock = content.first,
-            let text = firstBlock["text"] as? String
-        else { return nil }
-
-        // JSON bloğunu temizle
+    private func parseResponse(_ text: String) -> LLMCoachResponse? {
+        // Gemini bazen JSON'u markdown içinde (```json ... ```) döndürebilir, temizliyoruz.
         let cleaned = text
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .replacingOccurrences(of: "```json", with: "")
@@ -267,7 +249,10 @@ final class DefaultSleepCoachLLMAgent: SleepCoachLLMAgentProtocol {
         guard
             let data   = cleaned.data(using: .utf8),
             let parsed = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
-        else { return nil }
+        else {
+            print("Parsing Error: LLM'den gelen metin JSON'a çevrilemedi -> \(text)")
+            return nil
+        }
 
         return LLMCoachResponse(
             patternInsight:  parsed["pattern_insight"]  as? String ?? "",
