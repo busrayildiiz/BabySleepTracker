@@ -330,13 +330,12 @@ struct SleepListView: View {
 
         items.append(TimelineItem(
             icon: "sun.max.fill",
-            iconColor: .sleepSun,
+            iconColor: .orange,   // ← sleepSun yerine .orange
             time: shortTime(wakeUp),
             title: "Wake up",
             detail: "",
             isActive: false,
             isFuture: false
-            
         ))
 
         // 2. Her nap — aralarında uyanıklık süresi yok, çizgide gösterilecek
