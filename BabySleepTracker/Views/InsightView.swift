@@ -79,34 +79,37 @@ struct InsightsView: View {
 
     // MARK: - Tab Picker
 
-       private var tabPicker: some View {
-           HStack(spacing: 4) {
-               ForEach(CoachTab.allCases, id: \.self) { tab in
-                   Button {
-                       withAnimation(.easeInOut(duration: 0.18)) { selectedTab = tab }
-                   } label: {
-                       Label(tab.rawValue, systemImage: tab.icon)
-                           .font(.system(size: 12, weight: .semibold))
-                           .foregroundStyle(selectedTab == tab ? .white : CoachColor.muted)
-                           .frame(maxWidth: .infinity)
-                           .padding(.vertical, 9)
-                           .background(
-                               RoundedRectangle(cornerRadius: 11, style: .continuous)
-                                   .fill(Color(.systemBackground))
-                                   .shadow(color: CoachColor.ink.opacity(0.04), radius: 10, y: 4)
-                           )
-                   }
-                   .buttonStyle(.plain)
-               }
-           }
-           .padding(4)
-           .background(
-               RoundedRectangle(cornerRadius: 11, style: .continuous)
-                   .fill(Color.white)
-                   .shadow(color: CoachColor.ink.opacity(0.04), radius: 10, y: 4)
-           )
-           .overlay(cardStroke(cornerRadius: 11))
-       }
+    private var tabPicker: some View {
+        HStack(spacing: 4) {
+            ForEach(CoachTab.allCases, id: \.self) { tab in
+                Button {
+                    withAnimation(.easeInOut(duration: 0.18)) { selectedTab = tab }
+                } label: {
+                    Label(tab.rawValue, systemImage: tab.icon)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(selectedTab == tab ? .white : CoachColor.muted)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 9)
+                        .background(
+                            RoundedRectangle(cornerRadius: 11, style: .continuous)
+                                .fill(selectedTab == tab
+                                      ? CoachColor.purpleDeep          // ← seçili: mor
+                                      : Color.clear)                    // ← seçsiz: şeffaf
+                        )
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(4)
+        .background(
+            RoundedRectangle(cornerRadius: 15, style: .continuous)
+                .fill(Color(.secondarySystemGroupedBackground))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 15, style: .continuous)
+                .stroke(CoachColor.stroke, lineWidth: 1)
+        )
+    }
     
     // MARK: - Prediction Card
 

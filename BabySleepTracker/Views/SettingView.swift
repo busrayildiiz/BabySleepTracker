@@ -130,15 +130,8 @@ struct SettingsView: View {
         HStack {
             Text("Settings")
                 .font(.largeTitle.weight(.bold))
-            Spacer()
-            ZStack {
-                Circle()
-                    .fill(Color.indigo.opacity(0.10))
-                    .frame(width: 36, height: 36)
-                Image(systemName: "plus")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(.indigo)
-            }
+          
+           
         }
     }
 
