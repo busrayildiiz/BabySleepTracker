@@ -14,9 +14,9 @@ struct DaytimePrediction {
 }
 
 enum PredictionMode {
-    case ageBaseline      // 0–6 gün: yaş tablosundan
-    case blended          // 7–13 gün: karma
-    case personalized     // 14+ gün: bebeğin kendi verisi
+    case ageBaseline      // 0–6 gün
+    case blended          // 7–13 gün
+    case personalized     // 14+ gün
 }
 
 // MARK: - Protocol
@@ -58,21 +58,26 @@ final class DefaultDaytimePredictionAgent: DaytimePredictionAgentProtocol {
         now:          Date
     ) -> DaytimePrediction {
 
-        let profile   = profileProvider.profile(forAgeMonths: ageMonths)
-        let breaks    = todayRecords.filter { $0.kind == .break }
+        let profile  = profileProvider.profile(forAgeMonths: ageMonths)
+        let breaks   = todayRecords.filter { $0.kind == .break }
+
+        // Ongoing nap varsa ayrı tut — tamamlanmış naplar anchor için kullanılır
         let todayNaps = todayRecords
-            .filter { $0.kind == .dayNap }
+            .filter { $0.kind == .dayNap && !$0.isOngoing }
             .sorted { $0.date < $1.date }
 
-        // 1. Anchor — tahminın başlangıç noktası
+        let ongoingNap = todayRecords.first { $0.kind == .dayNap && $0.isOngoing }
+
+        // 1. Anchor
         let anchor = predictionAnchor(
             todayNaps:   todayNaps,
+            ongoingNap:  ongoingNap,
             breaks:      breaks,
             wakeRecords: wakeRecords,
             now:         now
         )
 
-        // 2. Wake window — blend oranına göre hesapla
+        // 2. Wake window
         let wakeWindow = blendedWakeWindow(
             profile:     profile,
             pattern:     pattern,
@@ -82,14 +87,14 @@ final class DefaultDaytimePredictionAgent: DaytimePredictionAgentProtocol {
         // 3. Tahmin zamanı
         let nextNapTime = anchor.time.addingMinutes(wakeWindow)
 
-        // 4. Mod ve pencere yarıçapı
+        // 4. Mod ve pencere
         let mode         = predictionMode(trackedDays: trackedDays, pattern: pattern)
         let windowRadius = windowRadius(for: mode)
 
         let windowStart = nextNapTime.addingMinutes(-windowRadius)
         let windowEnd   = nextNapTime.addingMinutes(windowRadius)
 
-        // 5. Beklenen nap süresi
+        // 5. Beklenen süre
         let expectedDuration = expectedNapDuration(
             profile:  profile,
             pattern:  pattern,
@@ -98,19 +103,21 @@ final class DefaultDaytimePredictionAgent: DaytimePredictionAgentProtocol {
 
         // 6. Güven skoru
         let confidence = calculateConfidence(
-            mode:        mode,
-            trackedDays: trackedDays,
-            hasWakeTime: anchor.hasTodayWakeTime,
-            hasPattern:  pattern != nil
+            mode:          mode,
+            trackedDays:   trackedDays,
+            hasWakeTime:   anchor.hasTodayWakeTime,
+            hasPattern:    pattern != nil,
+            hasOngoingNap: ongoingNap != nil
         )
 
         // 7. Gerekçeler
         let reasoning = buildReasoning(
-            mode:        mode,
-            anchor:      anchor,
-            wakeWindow:  wakeWindow,
-            ageMonths:   ageMonths,
-            trackedDays: trackedDays
+            mode:          mode,
+            anchor:        anchor,
+            wakeWindow:    wakeWindow,
+            ageMonths:     ageMonths,
+            trackedDays:   trackedDays,
+            hasOngoingNap: ongoingNap != nil
         )
 
         return DaytimePrediction(
@@ -129,31 +136,50 @@ final class DefaultDaytimePredictionAgent: DaytimePredictionAgentProtocol {
 
     private func predictionAnchor(
         todayNaps:   [SleepRecord],
+        ongoingNap:  SleepRecord?,
         breaks:      [SleepRecord],
         wakeRecords: [DailyWakeRecord],
         now:         Date
     ) -> (time: Date, hasTodayWakeTime: Bool) {
 
-        // Son napın net bitiş saati (break dahil etkili süre)
+        // FIX 2: Ongoing nap — bebek hâlâ uyuyor
+        // Tahmini bitiş = başlangıç + max(45 dk, şimdiye kadar geçen süre + 30 dk)
+        if let ongoing = ongoingNap {
+            let elapsed          = max(0, Int(now.timeIntervalSince(ongoing.date) / 60))
+            let estimatedEnd     = ongoing.date.addingMinutes(max(45, elapsed + 30))
+            let anchorTime       = estimatedEnd > now ? estimatedEnd : now
+            return (anchorTime, true)
+        }
+
+        // Tamamlanmış son napın net bitiş saati
         if let lastNap = todayNaps.last {
-            let effectiveMinutes = lastNap.totalMinutes(breaks: breaks)
-            let end = lastNap.date.addingMinutes(effectiveMinutes)
-            return (end, true)
+            let net      = lastNap.totalMinutes(breaks: breaks)
+            let duration = net > 0 ? net : lastNap.duration   // sıfır gelirse ham süreye dön
+            return (lastNap.date.addingMinutes(duration), true)
         }
 
-        // Bugünün wake record'u varsa kullan
-        if let wake = wakeRecords
-            .filter({ calendar.isDate($0.day, inSameDayAs: now) })
-            .max(by: { $0.wakeTime < $1.wakeTime }) {
-            return (wake.wakeTime, true)
+        // FIX 3: Aynı gün birden fazla wake record olabilir
+        // En geç wake time'ı kullan (en son güncellenen)
+        let todayWakes = wakeRecords
+            .filter { calendar.isDate($0.day, inSameDayAs: now) }
+            .sorted { $0.wakeTime < $1.wakeTime }
+
+        if let latestWake = todayWakes.last {
+            return (latestWake.wakeTime, true)
         }
 
-        // Fallback: bugünün 07:00'ı
-        // Gece 00:00–07:00 arasındaysak henüz sabah olmadı → 07:00 anchor
-        // 07:00 geçtiyse → now anchor (kullanıcı kayıt girmemiş)
-        let today    = calendar.startOfDay(for: now)
-        let morning7 = calendar.date(bySettingHour: 7, minute: 0, second: 0, of: today) ?? now
-        let fallback = now >= morning7 ? now : morning7
+        // Fallback: gece 00:00–07:00 arası → sabah 07:00, sonrası → now
+        // Fallback: gece 00:00–07:00 arası → kullanıcının typical wake time'ı, sonrası → now
+        let today = calendar.startOfDay(for: now)
+
+        let wakeHour   = UserDefaults.standard.object(forKey: "typicalWakeHour")   as? Double ?? 7.0
+        let wakeMinute = UserDefaults.standard.object(forKey: "typicalWakeMinute") as? Double ?? 0.0
+
+        let typicalWake = calendar.date(
+            bySettingHour: Int(wakeHour), minute: Int(wakeMinute), second: 0, of: today
+        ) ?? now
+
+        let fallback = now >= typicalWake ? now : typicalWake
         return (fallback, false)
     }
 
@@ -219,10 +245,11 @@ final class DefaultDaytimePredictionAgent: DaytimePredictionAgentProtocol {
     // MARK: - Confidence
 
     private func calculateConfidence(
-        mode:        PredictionMode,
-        trackedDays: Int,
-        hasWakeTime: Bool,
-        hasPattern:  Bool
+        mode:          PredictionMode,
+        trackedDays:   Int,
+        hasWakeTime:   Bool,
+        hasPattern:    Bool,
+        hasOngoingNap: Bool
     ) -> Int {
         var score: Int
         switch mode {
@@ -230,23 +257,28 @@ final class DefaultDaytimePredictionAgent: DaytimePredictionAgentProtocol {
         case .blended:      score = 58 + (trackedDays - 7) * 2
         case .personalized: score = 76
         }
-        if hasWakeTime { score += 8 }
-        if hasPattern  { score += 5 }
-        return min(score, 94)
+        if hasWakeTime    { score += 8 }
+        if hasPattern     { score += 5 }
+        // Ongoing nap bitiş zamanı belirsiz — güven düşer
+        if hasOngoingNap  { score -= 10 }
+        return min(max(score, 0), 94)
     }
 
     // MARK: - Reasoning
 
     private func buildReasoning(
-        mode:        PredictionMode,
-        anchor:      (time: Date, hasTodayWakeTime: Bool),
-        wakeWindow:  Int,
-        ageMonths:   Int,
-        trackedDays: Int
+        mode:          PredictionMode,
+        anchor:        (time: Date, hasTodayWakeTime: Bool),
+        wakeWindow:    Int,
+        ageMonths:     Int,
+        trackedDays:   Int,
+        hasOngoingNap: Bool
     ) -> [String] {
         var parts = [String]()
 
-        if anchor.hasTodayWakeTime {
+        if hasOngoingNap {
+            parts.append("Baby is currently sleeping — prediction based on estimated nap end time.")
+        } else if anchor.hasTodayWakeTime {
             parts.append("Calculated from today's wake-up or last nap end time.")
         } else {
             parts.append("No wake time recorded — defaulted to 7:00 AM. Adding it improves accuracy.")
@@ -256,9 +288,9 @@ final class DefaultDaytimePredictionAgent: DaytimePredictionAgentProtocol {
         case .ageBaseline:
             parts.append("Using age baseline for \(ageMonths)-month-old (\(wakeWindow) min wake window).")
         case .blended:
-            parts.append("Blending age baseline with \(trackedDays) days of tracked data (\(wakeWindow) min).")
+            parts.append("Blending age baseline with \(trackedDays) days of data (\(wakeWindow) min).")
         case .personalized:
-            parts.append("Personalized from \(babyName())'s own sleep pattern (\(wakeWindow) min).")
+            parts.append("Personalized from \(loadBabyName())'s own sleep pattern (\(wakeWindow) min).")
         }
 
         if trackedDays < 14 {
@@ -269,7 +301,7 @@ final class DefaultDaytimePredictionAgent: DaytimePredictionAgentProtocol {
         return parts
     }
 
-    private func babyName() -> String {
+    private func loadBabyName() -> String {
         let name = UserDefaults.standard.string(forKey: "babyName")?
             .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         return name.isEmpty ? "Baby" : name

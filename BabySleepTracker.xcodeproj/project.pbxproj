@@ -35,6 +35,7 @@
 		FA9DB0A92FD49ED4000B9211 /* CreateAccountView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA9DB0A82FD49ED4000B9211 /* CreateAccountView.swift */; };
 		FAAD82CE2FDBCDF100F0FBC6 /* PhaseAgent.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAAD82CD2FDBCDF100F0FBC6 /* PhaseAgent.swift */; };
 		FAAD82D02FDBCE3C00F0FBC6 /* PhaseAgentProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAAD82CF2FDBCE3C00F0FBC6 /* PhaseAgentProtocol.swift */; };
+		FAB4BAFC2FE11F9800702F49 /* ProfileEditSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAB4BAFB2FE11F9700702F49 /* ProfileEditSheet.swift */; };
 		FAD9C3722FDBD0CA00A7D9B7 /* PatternAgent.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAD9C3712FDBD0CA00A7D9B7 /* PatternAgent.swift */; };
 		FAD9C3742FDBD14100A7D9B7 /* PatternAgentProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAD9C3732FDBD14100A7D9B7 /* PatternAgentProtocol.swift */; };
 		FAEF10442F4E207F00E76FD4 /* BabySleepTrackerApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAEF10432F4E207F00E76FD4 /* BabySleepTrackerApp.swift */; };
@@ -98,6 +99,7 @@
 		FA9DB0A82FD49ED4000B9211 /* CreateAccountView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreateAccountView.swift; sourceTree = "<group>"; };
 		FAAD82CD2FDBCDF100F0FBC6 /* PhaseAgent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhaseAgent.swift; sourceTree = "<group>"; };
 		FAAD82CF2FDBCE3C00F0FBC6 /* PhaseAgentProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhaseAgentProtocol.swift; sourceTree = "<group>"; };
+		FAB4BAFB2FE11F9700702F49 /* ProfileEditSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileEditSheet.swift; sourceTree = "<group>"; };
 		FAD9C3712FDBD0CA00A7D9B7 /* PatternAgent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PatternAgent.swift; sourceTree = "<group>"; };
 		FAD9C3732FDBD14100A7D9B7 /* PatternAgentProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PatternAgentProtocol.swift; sourceTree = "<group>"; };
 		FAEF10402F4E207F00E76FD4 /* BabySleepTracker.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BabySleepTracker.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -212,6 +214,7 @@
 		FAEF10372F4E207F00E76FD4 = {
 			isa = PBXGroup;
 			children = (
+				FAB4BAFB2FE11F9700702F49 /* ProfileEditSheet.swift */,
 				FA7232E62FDD8D6D00647487 /* SleepCoachLLMAgent.swift */,
 				FA7232E42FDCCD6000647487 /* SleepCoachOrchestrator.swift */,
 				FA7232E22FDCCC6500647487 /* Date+Extensions.swift */,
@@ -436,6 +439,7 @@
 				FA9DB09F2FD44B3F000B9211 /* SettingView.swift in Sources */,
 				FA91C5F52FDB4C4A0089E1EE /* AAPSleepGuidelineAgent.swift in Sources */,
 				FA91C5E82FDB472E0089E1EE /* InsightAgent.swift in Sources */,
+				FAB4BAFC2FE11F9800702F49 /* ProfileEditSheet.swift in Sources */,
 				FA5488CB2FAEB831002BC18B /* SleepAPI.swift in Sources */,
 				FAEF105B2F4E210600E76FD4 /* SleepRecord.swift in Sources */,
 				FAEF10592F4E20D600E76FD4 /* AddRecordView.swift in Sources */,

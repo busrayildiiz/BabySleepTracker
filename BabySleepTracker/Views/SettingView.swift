@@ -9,7 +9,6 @@ import Foundation
 import SwiftUI
 import PhotosUI
 
-
 struct SettingsView: View {
 
     @State private var records: [SleepRecord] = []
@@ -18,6 +17,7 @@ struct SettingsView: View {
     @State private var selectedPhoto: PhotosPickerItem? = nil
     @State private var avatarImage: UIImage? = nil
     @State private var showAppearanceSheet = false
+    @State private var showProfileEdit = false
     @AppStorage("babyName") private var babyName: String = "Baby"
     @AppStorage("appAppearance") private var appAppearance: String = "system"
 
@@ -90,6 +90,15 @@ struct SettingsView: View {
         }
     }
 
+    private var babyGenderEmoji: String {
+        let gender = UserDefaults.standard.string(forKey: "babyGender") ?? "Prefer not to say"
+        switch gender {
+        case "Girl": return "👧"
+        case "Boy":  return "👦"
+        default:     return "👶"
+        }
+    }
+
     // MARK: - Body
 
     var body: some View {
@@ -122,6 +131,9 @@ struct SettingsView: View {
             Button("Dark")   { appAppearance = "dark" }
             Button("Cancel", role: .cancel) { }
         }
+        .sheet(isPresented: $showProfileEdit) {
+            ProfileEditSheet()
+        }
     }
 
     // MARK: - Header
@@ -130,8 +142,6 @@ struct SettingsView: View {
         HStack {
             Text("Settings")
                 .font(.largeTitle.weight(.bold))
-          
-           
         }
     }
 
@@ -139,6 +149,7 @@ struct SettingsView: View {
 
     private var profileCard: some View {
         HStack(spacing: 14) {
+
             ZStack(alignment: .bottomTrailing) {
                 ZStack {
                     Circle()
@@ -152,7 +163,7 @@ struct SettingsView: View {
                             .frame(width: 64, height: 64)
                             .clipShape(Circle())
                     } else {
-                        Text("👶")
+                        Text(babyGenderEmoji)
                             .font(.system(size: 36))
                     }
                 }
@@ -180,22 +191,31 @@ struct SettingsView: View {
                 }
             }
 
-            VStack(alignment: .leading, spacing: 4) {
-                Text("\(babyName) & You")
-                    .font(.headline.weight(.bold))
-                HStack(spacing: 4) {
-                    Text("Keep tracking, keep growing")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                    Text("💜")
+            Button {
+                showProfileEdit = true
+            } label: {
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("\(babyName) & You")
+                            .font(.headline.weight(.bold))
+                            .foregroundStyle(.primary)
+                        HStack(spacing: 4) {
+                            Text("Keep tracking, keep growing")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                            Text("💜")
+                        }
+                    }
+
+                    Spacer()
+
+                    Image(systemName: "chevron.right")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.tertiary)
                 }
+                .contentShape(Rectangle())
             }
-
-            Spacer()
-
-            Image(systemName: "chevron.right")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.tertiary)
+            .buttonStyle(.plain)
         }
         .padding(16)
         .background(
@@ -328,11 +348,17 @@ struct SettingsView: View {
 
     private var babyProfileSection: some View {
         settingsSection(title: "BABY PROFILE") {
-            settingsRowChevron(
-                icon: "face.smiling", iconColor: .indigo,
-                title: "\(babyName)'s Profile",
-                subtitle: "Age, sleep needs, and more"
-            )
+            Button {
+                showProfileEdit = true
+            } label: {
+                settingsRowChevron(
+                    icon: "face.smiling", iconColor: .indigo,
+                    title: "\(babyName)'s Profile",
+                    subtitle: "Age, sleep needs, and more"
+                )
+            }
+            .buttonStyle(.plain)
+
             Divider().padding(.leading, 52)
             settingsRowChevron(
                 icon: "list.clipboard", iconColor: .indigo,

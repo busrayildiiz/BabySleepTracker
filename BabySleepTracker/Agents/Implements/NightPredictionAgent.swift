@@ -89,99 +89,121 @@ final class DefaultNightPredictionAgent: NightPredictionAgentProtocol {
                 now:                       now
             )
         } else {
-                   // Bugün hiç nap yok — wake record'dan hesapla
-                   bedtimeWindow = fallbackBedtimeWindow(
-                       wakeRecords:  wakeRecords,
-                       profile:      profile,
-                       ageMonths:    ageMonths,
-                       now:          now
-                   )
-               }
+            // Bugün hiç nap yok — wake record'dan hesapla
+            bedtimeWindow = fallbackBedtimeWindow(
+                wakeRecords:  wakeRecords,
+                profile:      profile,
+                ageMonths:    ageMonths,
+                now:          now
+            )
+        }
 
-               // 4. Son nap cutoff saati
-               let cutoff = overtiredCalculator.lastNapCutoffTime(
-                   ageMonths: ageMonths,
-                   on:        now
-               )
+        // 4. Son nap cutoff saati
+        let cutoff = overtiredCalculator.lastNapCutoffTime(
+            ageMonths: ageMonths,
+            on:        now
+        )
 
-               // 5. Beklenen gece uykusu süresi
-               let expectedNight = expectedNightSleep(
-                   profile: profile,
-                   pattern: pattern
-               )
+        // 5. Beklenen gece uykusu süresi
+        let expectedNight = expectedNightSleep(
+            profile: profile,
+            pattern: pattern
+        )
 
-               // 6. Günlük uyku durumu
-               let sleepStatus = overtiredCalculator.dailySleepStatus(
-                   totalMinutes: totalDaytime,
-                   ageMonths:    ageMonths
-               )
+        // 6. Günlük uyku durumu
+        let sleepStatus = overtiredCalculator.dailySleepStatus(
+            totalMinutes: totalDaytime,
+            ageMonths:    ageMonths
+        )
 
-               // 7. Güven skoru
-               let confidence = calculateConfidence(
-                   trackedDays:   trackedDays,
-                   hasLastNap:    lastNapEnd != nil,
-                   hasWakeRecord: todayWakeRecord(wakeRecords: wakeRecords, now: now) != nil,
-                   hasPattern:    pattern != nil
-               )
+        // 7. Güven skoru
+        let confidence = calculateConfidence(
+            trackedDays:   trackedDays,
+            hasLastNap:    lastNapEnd != nil,
+            hasWakeRecord: todayWakeRecord(wakeRecords: wakeRecords, now: now) != nil,
+            hasPattern:    pattern != nil
+        )
+
         // 8. Gerekçeler
-                let reasoning = buildReasoning(
-                    profile:       profile,
-                    lastNapEnd:    lastNapEnd,
-                    totalDaytime:  totalDaytime,
-                    bedtime:       bedtimeWindow.ideal,
-                    ageMonths:     ageMonths,
-                    sleepStatus:   sleepStatus
-                )
+        let reasoning = buildReasoning(
+            profile:       profile,
+            lastNapEnd:    lastNapEnd,
+            totalDaytime:  totalDaytime,
+            bedtime:       bedtimeWindow.ideal,
+            ageMonths:     ageMonths,
+            sleepStatus:   sleepStatus
+        )
 
-                return NightPrediction(
-                    optimalBedtimeStart:       bedtimeWindow.earliest,
-                    optimalBedtimeEnd:         bedtimeWindow.latest,
-                    overtiredRiskTime:         bedtimeWindow.overtiredRisk,
-                    expectedNightSleepMinutes: expectedNight,
-                    lastNapCutoffTime:         cutoff,
-                    daytimeSleepStatus:        sleepStatus,
-                    confidence:                confidence,
-                    reasoning:                 reasoning
-                )
-            }
+        return NightPrediction(
+            optimalBedtimeStart:       bedtimeWindow.earliest,
+            optimalBedtimeEnd:         bedtimeWindow.latest,
+            overtiredRiskTime:         bedtimeWindow.overtiredRisk,
+            expectedNightSleepMinutes: expectedNight,
+            lastNapCutoffTime:         cutoff,
+            daytimeSleepStatus:        sleepStatus,
+            confidence:                confidence,
+            reasoning:                 reasoning
+        )
+    }
 
-            // MARK: - Fallback Bedtime (nap yok)
+    // MARK: - Fallback Bedtime (nap yok)
 
-            private func fallbackBedtimeWindow(
-                wakeRecords: [DailyWakeRecord],
-                profile:     AgeBasedSleepProfile,
-                ageMonths:   Int,
-                now:         Date
-            ) -> BedtimeWindow {
-                
-                // Wake record varsa ondan hesapla
-                        if let wake = todayWakeRecord(wakeRecords: wakeRecords, now: now) {
-                            return overtiredCalculator.bedtimeWindow(
-                                lastNapEndTime:           wake.wakeTime,
-                                totalDaytimeSleepMinutes: 0,
-                                ageMonths:                ageMonths,
-                                now:                      now
-                            )
-                        }
+    private func fallbackBedtimeWindow(
+        wakeRecords: [DailyWakeRecord],
+        profile:     AgeBasedSleepProfile,
+        ageMonths:   Int,
+        now:         Date
+    ) -> BedtimeWindow {
 
-                        // Hiç veri yok — profile'dan sabit pencere üret
-                        let bedtimeHour   = profile.bedtimeHourRange.lowerBound
-                        let idealBedtime  = calendar.date(
-                            bySettingHour: bedtimeHour + 1,
-                            minute:        0,
-                            second:        0,
-                            of:            now
-                        ) ?? now
+        // Wake record varsa ondan hesapla
+        if let wake = todayWakeRecord(wakeRecords: wakeRecords, now: now) {
+            return overtiredCalculator.bedtimeWindow(
+                lastNapEndTime:           wake.wakeTime,
+                totalDaytimeSleepMinutes: 0,
+                ageMonths:                ageMonths,
+                now:                      now
+            )
+        }
 
-                        return BedtimeWindow(
-                            earliest:      idealBedtime.addingMinutes(-30),
-                            ideal:         idealBedtime,
-                            latest:        idealBedtime.addingMinutes(30),
-                            overtiredRisk: idealBedtime.addingMinutes(50),
-                            risk:          .healthy,
-                            reasoning:     "Veri yetersiz — yaşa göre tipik yatış saati kullanıldı."
-                        )
-                    }
+        // Hiç veri yok — kullanıcının kaydettiği typical bedtime'ı kullan
+        // Settings'te ayarlanmadıysa profile'dan yaşa göre default'a düş
+        let today = calendar.startOfDay(for: now)
+
+        let hasUserBedtime = UserDefaults.standard.object(forKey: "typicalBedHour") != nil
+        let idealBedtime: Date
+
+        if hasUserBedtime {
+            let bedHour   = UserDefaults.standard.double(forKey: "typicalBedHour")
+            let bedMinute = UserDefaults.standard.double(forKey: "typicalBedMinute")
+            idealBedtime = calendar.date(
+                bySettingHour: Int(bedHour),
+                minute:        Int(bedMinute),
+                second:        0,
+                of:            today
+            ) ?? now
+        } else {
+            let bedtimeHour = profile.bedtimeHourRange.lowerBound
+            idealBedtime = calendar.date(
+                bySettingHour: bedtimeHour + 1,
+                minute:        0,
+                second:        0,
+                of:            today
+            ) ?? now
+        }
+
+        let reasonText = hasUserBedtime
+            ? "No nap recorded — using your saved typical bedtime."
+            : "Not enough data — using age-based typical bedtime."
+
+        return BedtimeWindow(
+            earliest:      idealBedtime.addingMinutes(-30),
+            ideal:         idealBedtime,
+            latest:        idealBedtime.addingMinutes(30),
+            overtiredRisk: idealBedtime.addingMinutes(50),
+            risk:          .healthy,
+            reasoning:     reasonText
+        )
+    }
 
     // MARK: - Expected Night Sleep
 
@@ -220,7 +242,7 @@ final class DefaultNightPredictionAgent: NightPredictionAgentProtocol {
         ageMonths:    Int,
         sleepStatus:  DailySleepStatus
     ) -> [String] {
-        
+
         let formatter        = DateFormatter()
         formatter.locale     = Locale(identifier: "en_US_POSIX")
         formatter.dateFormat = "h:mm a"
@@ -228,32 +250,33 @@ final class DefaultNightPredictionAgent: NightPredictionAgentProtocol {
         var parts = [String]()
 
         if let napEnd = lastNapEnd {
-            parts.append("Son nap \(formatter.string(from: napEnd))'de bitti.")
+            parts.append("Last nap ended at \(formatter.string(from: napEnd)).")
         } else {
-            parts.append("Bugün nap kaydedilmedi — yaşa göre sabit pencere kullanıldı.")
+            parts.append("No nap recorded today — used age-based fixed window.")
         }
 
         let ewwCenter = (profile.eveningWakeWindow.lowerBound + profile.eveningWakeWindow.upperBound) / 2
-        parts.append("\(ageMonths) aylık için akşam uyanıklık penceresi ~\(ewwCenter) dk.")
+        parts.append("Evening wake window for \(ageMonths)-month-old is ~\(ewwCenter) min.")
 
         switch sleepStatus {
         case .below(let deficit):
-            parts.append("Gündüz uykusu \(TimeFormat.minutes(deficit)) eksik — yatış öne alındı.")
+            parts.append("Daytime sleep is \(TimeFormat.minutes(deficit)) short — bedtime moved earlier.")
         case .above(let excess):
-            parts.append("Gündüz uykusu \(TimeFormat.minutes(excess)) fazla — gece gecikmesi olabilir.")
+            parts.append("Daytime sleep is \(TimeFormat.minutes(excess)) over — bedtime may be delayed.")
         case .onTrack:
-            parts.append("Gündüz uyku hedefte.")
+            parts.append("Daytime sleep is on target.")
         }
 
-        parts.append("Önerilen yatış: \(formatter.string(from: bedtime)).")
+        parts.append("Recommended bedtime: \(formatter.string(from: bedtime)).")
         return parts
     }
+
     // MARK: - Helper
 
-        private func todayWakeRecord(
-            wakeRecords: [DailyWakeRecord],
-            now:         Date
-        ) -> DailyWakeRecord? {
-            wakeRecords.first { calendar.isDate($0.day, inSameDayAs: now) }
-        }
+    private func todayWakeRecord(
+        wakeRecords: [DailyWakeRecord],
+        now:         Date
+    ) -> DailyWakeRecord? {
+        wakeRecords.first { calendar.isDate($0.day, inSameDayAs: now) }
     }
+}
