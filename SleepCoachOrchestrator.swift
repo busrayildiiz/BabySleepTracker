@@ -227,7 +227,7 @@ final class SleepCoachOrchestrator: ObservableObject {
                     sleepStatus:       sleepStatus,
                     nextSleepKind: nextSleepKind
                 )
-           
+                self.snapshot = result 
                 let trigger = determineTrigger(
                     records:    records,
                     snapshot:   result,
@@ -238,7 +238,6 @@ final class SleepCoachOrchestrator: ObservableObject {
                    await callLLM(snapshot: result, records: records, trigger: trigger!)
                }
            }
-    
          
        }
 

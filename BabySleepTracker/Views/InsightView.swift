@@ -92,7 +92,7 @@ struct InsightsView: View {
                            .padding(.vertical, 9)
                            .background(
                                RoundedRectangle(cornerRadius: 11, style: .continuous)
-                                   .fill(Color(.systemBackground))   // ← Color.white yerine
+                                   .fill(Color(.systemBackground))
                                    .shadow(color: CoachColor.ink.opacity(0.04), radius: 10, y: 4)
                            )
                    }
