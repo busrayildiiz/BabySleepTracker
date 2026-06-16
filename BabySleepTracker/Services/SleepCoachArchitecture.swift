@@ -239,7 +239,12 @@ final class SleepCoachService {
             .max(by: { $0.wakeTime < $1.wakeTime }) {
             return (wake.wakeTime, true)
         }
-        let fallback = calendar.date(bySettingHour: 7, minute: 0, second: 0, of: now) ?? now
+        // Fallback: bir sonraki sabah 07:00 değil, TODAY'in mantıklı saati
+        let today = calendar.startOfDay(for: now)
+        let morning7 = calendar.date(bySettingHour: 7, minute: 0, second: 0, of: today) ?? now
+
+        // Eğer 07:00 geçtiyse now'u kullan, geçmediyse 07:00
+        let fallback = now > morning7 ? now : morning7
         return (fallback, false)
     }
 
