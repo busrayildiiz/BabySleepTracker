@@ -167,9 +167,9 @@ final class DefaultDaytimePredictionAgent: DaytimePredictionAgentProtocol {
             return (latestWake.wakeTime, true)
         }
 
-        // FIX: Hiç kayıt yoksa — Settings'te kaydedilen "typical wake time"ı kullan
-        // Bu artık GERÇEK kayıt değil, varsayım — hasTodayWakeTime = false döner
-        // ki UI'da "varsayılan kullanıldı" uyarısı gösterilebilsin
+        // Hiç kayıt yoksa — Settings'te kaydedilen "typical wake time"ı her zaman kullan.
+        // "now" kullanılmaz çünkü kayıt eksikliği "şimdi uyandı" anlamına gelmez,
+        // "muhtemelen typicalWake'de uyandı ama henüz loglanmadı" anlamına gelir.
         let today = calendar.startOfDay(for: now)
 
         let wakeHour   = UserDefaults.standard.object(forKey: "typicalWakeHour")   as? Double ?? 7.0
@@ -182,9 +182,7 @@ final class DefaultDaytimePredictionAgent: DaytimePredictionAgentProtocol {
             of:            today
         ) ?? now
 
-        // Henüz typical wake time geçmediyse onu kullan, geçtiyse now anchor
-        let fallback = now >= typicalWake ? now : typicalWake
-        return (fallback, false)   // false = bu gerçek bir kayıt değil, varsayım
+        return (typicalWake, false)   // false = bu gerçek bir kayıt değil, varsayım
     }
 
     // MARK: - Blended Wake Window
@@ -311,3 +309,10 @@ final class DefaultDaytimePredictionAgent: DaytimePredictionAgentProtocol {
     }
 }
 
+// MARK: - Date Extension
+
+extension Date {
+    func addingMinutes(_ minutes: Int) -> Date {
+        Calendar.current.date(byAdding: .minute, value: minutes, to: self) ?? self
+    }
+}
