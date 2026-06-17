@@ -1,17 +1,12 @@
-//
-//  APIConfig.swift
-//  BabySleepTracker
-//
-//  Created by MacBook on 13.06.2026.
-
-
 import Foundation
 
-enum APIConfig {
-    // Production'da Keychain'e taşı
-    static let geminiKey = ""  
+struct APIConfig {
+    static var geminiKey: String {
+        guard let key = Bundle.main.object(forInfoDictionaryKey: "GeminiApiKey") as? String else {
+            print("⚠️ HATA: Info.plist içinde 'GeminiApiKey' bulunamadı!")
+            return ""
+        }
+        // Eğer her ihtimale karşı ham string veya boşluk kaldıysa temizleriz
+        return key.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
 }
-
-
-
-
