@@ -98,6 +98,22 @@ struct SettingsView: View {
         default:     return "👶"
         }
     }
+    
+    private var babyAgeText: String {
+        let birthDate: Date?
+        if let saved = UserDefaults.standard.object(forKey: "babyBirthDate") as? Date {
+            birthDate = saved
+        } else if let seconds = UserDefaults.standard.object(forKey: "babyBirthDate") as? Double {
+            birthDate = Date(timeIntervalSince1970: seconds)
+        } else {
+            birthDate = nil
+        }
+        guard let birth = birthDate else { return "—" }
+        let months = Calendar.current.dateComponents([.month], from: birth, to: Date()).month ?? 0
+        if months < 1 { return "Newborn" }
+        if months < 24 { return "\(months) months" }
+        return "\(months / 12) years"
+    }
 
     // MARK: - Body
 
@@ -278,7 +294,7 @@ struct SettingsView: View {
 
             HStack(spacing: 0) {
                 glanceCell(icon: "face.smiling", iconColor: .indigo,
-                           label: "Age", value: "9 months")
+                           label: "Age", value: babyAgeText)
                 Divider().frame(height: 44)
                 glanceCell(icon: "moon.fill", iconColor: .indigo,
                            label: "Avg Daily Nap",

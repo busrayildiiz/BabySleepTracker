@@ -308,11 +308,3 @@ final class DefaultDaytimePredictionAgent: DaytimePredictionAgentProtocol {
         return name.isEmpty ? "Baby" : name
     }
 }
-
-// MARK: - Date Extension
-
-extension Date {
-    func addingMinutes(_ minutes: Int) -> Date {
-        Calendar.current.date(byAdding: .minute, value: minutes, to: self) ?? self
-    }
-}
