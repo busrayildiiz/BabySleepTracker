@@ -159,7 +159,9 @@ struct SleepListView: View {
     private var defaultWakeTime: Date {
         Calendar.current.date(bySettingHour: 7, minute: 0, second: 0, of: Date()) ?? Date()
     }
+    
 
+    
     private var displayedParentName: String {
         let name = parentName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !name.isEmpty else { return "there" }
@@ -399,6 +401,50 @@ struct SleepListView: View {
 
                 predictedAnchor = predictedStart.addingMinutes(expectedDuration)
             }
+            
+            // 3. Bedtime veya next nap
+            let lastNapEnd: Date? = sortedNaps.last.map {
+                Calendar.current.date(byAdding: .minute, value: $0.duration, to: $0.date) ?? $0.date
+            }
+
+            if isNextNapOverdue {
+                // Geçmiş nap zamanı — turuncu "missed" node göster
+                let awakeBeforeMissed = lastNapEnd.map {
+                    max(0, Int(nextNapTime.timeIntervalSince($0) / 60))
+                } ?? max(0, Int(nextNapTime.timeIntervalSince(wakeUp) / 60))
+
+                items.append(TimelineItem(
+                    icon: "exclamationmark.triangle.fill",
+                    iconColor: .orange,
+                    time: shortTime(nextNapTime),
+                    title: "Nap missed",
+                    detail: "Not logged",
+                    isActive: false,
+                    isFuture: false,
+                    awakeBeforeMinutes: awakeBeforeMissed,
+                    isOverdue: true
+                ))
+
+                // Sonraki tahmini napı da ekle
+                let awakeBeforeNext = max(0, Int(nextNapAfterMissed.timeIntervalSince(nextNapTime) / 60))
+                items.append(TimelineItem(
+                    icon: "moon.fill",
+                    iconColor: .sleepPurple.opacity(0.45),
+                    time: "Next nap",
+                    title: shortTime(nextNapAfterMissed),
+                    detail: "~\(TimeFormat.minutes(orchestrator.snapshot?.daytime.expectedDurationMinutes ?? 90)) expected",
+                    isActive: false,
+                    isFuture: true,
+                    awakeBeforeMinutes: awakeBeforeNext
+                ))
+            } else {
+                let referenceTime = resolveReferenceTime()
+                let awakeBeforeBed = lastNapEnd.map {
+                    max(0, Int(referenceTime.timeIntervalSince($0) / 60))
+                } ?? max(0, Int(referenceTime.timeIntervalSince(wakeUp) / 60))
+
+                items.append(nightOrNapTimelineItem(awakeBeforeMinutes: awakeBeforeBed))
+            }
 
             // 4. Bedtime — sadece toplam item sayısı 4'ü aşmıyorsa ekle
             if items.count < 4 {
@@ -417,6 +463,7 @@ struct SleepListView: View {
                     awakeBeforeMinutes: awakeBeforeBed
                 ))
             }
+            
 
             // Güvenlik: 4'ü aşarsa kırp (ör. expectedNapSlotCount 3 ve hepsi loglanmışsa tam 4 olur, sorun yok;
             // ama olası edge-case'lerde son 4'ü göster)
@@ -520,9 +567,7 @@ struct SleepListView: View {
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 12) {
                     headerSection
-                    totalSleepCard
                     nextNapOrBedtimeCard
-
                     if usingDefaultWakeTime {
                         defaultWakeTimeWarningBanner
                     }
@@ -530,11 +575,16 @@ struct SleepListView: View {
                     if orchestrator.snapshot?.nextSleepKind == .nap {
                         bedtimeWindowCard
                     }
-
-                    statsRow
                     todayTimelineCard
                     coachInsightCard
                     todayWakeUpCard
+
+
+                    totalSleepCard
+                    
+
+                  
+                    statsRow
 
                     if !records.isEmpty { recentDaysSection }
                 }
@@ -556,6 +606,9 @@ struct SleepListView: View {
             }
             .onReceive(NotificationCenter.default.publisher(for: .dailyWakeRecordsDidChange)) { _ in
                 loadWakeRecords()
+                orchestrator.generate()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .babyProfileDidChange)) { _ in
                 orchestrator.generate()
             }
             .environment(\.locale, Locale(identifier: "en_US"))
@@ -699,7 +752,7 @@ struct SleepListView: View {
             return Date() < typicalWake
         }
 
-        // MARK: next nap or bedtime?
+    // MARK: next nap or bedtime?
 
         @ViewBuilder
         private var nextNapOrBedtimeCard: some View {
@@ -710,46 +763,9 @@ struct SleepListView: View {
             }
         }
 
-        // MARK: Still Sleeping Card (gece, henüz wake time gelmedi)
+ 
 
-        private var stillSleepingCard: some View {
-            HStack(spacing: 12) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("STILL ASLEEP")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(Color.sleepPurpleDeep)
-                    Text("Sleeping")
-                        .font(.system(size: 26, weight: .medium, design: .rounded))
-                        .foregroundStyle(.primary)
-                    Text("Expected to wake around \(shortTime(typicalWakeDate))")
-                        .font(.system(size: 12))
-                        .foregroundStyle(Color.sleepPurpleDeep.opacity(0.8))
-                }
-                Spacer()
-                ZStack {
-                    Circle().fill(Color.sleepPurpleDeep).frame(width: 46, height: 46)
-                    Image(systemName: "moon.zzz.fill")
-                        .font(.system(size: 20))
-                        .foregroundStyle(.white)
-                }
-            }
-            .padding(16)
-            .background(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .fill(Color.sleepPurple.opacity(0.12))
-            )
-        }
-
-        private var typicalWakeDate: Date {
-            let wakeHour   = UserDefaults.standard.object(forKey: "typicalWakeHour")   as? Double ?? 7.0
-            let wakeMinute = UserDefaults.standard.object(forKey: "typicalWakeMinute") as? Double ?? 0.0
-            let today = Calendar.current.startOfDay(for: Date())
-            return Calendar.current.date(
-                bySettingHour: Int(wakeHour), minute: Int(wakeMinute), second: 0, of: today
-            ) ?? Date()
-        }
-
-        // MARK: Regular Next Nap / Bedtime Card (mevcut mantık aynen)
+        // MARK: Regular Next Nap / Bedtime Card
 
         private var regularNextNapOrBedtimeCard: some View {
             let isBedtime = orchestrator.snapshot?.nextSleepKind == .bedtime
@@ -803,6 +819,46 @@ struct SleepListView: View {
             }
             .buttonStyle(CardPressButtonStyle())
         }
+
+        // MARK: Still Sleeping Card (gece, henüz wake time gelmedi)
+
+        private var stillSleepingCard: some View {
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("STILL ASLEEP")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(Color.sleepPurpleDeep)
+                    Text("Sleeping")
+                        .font(.system(size: 26, weight: .medium, design: .rounded))
+                        .foregroundStyle(.primary)
+                    Text("Expected to wake around \(shortTime(typicalWakeDate))")
+                        .font(.system(size: 12))
+                        .foregroundStyle(Color.sleepPurpleDeep.opacity(0.8))
+                }
+                Spacer()
+                ZStack {
+                    Circle().fill(Color.sleepPurpleDeep).frame(width: 46, height: 46)
+                    Image(systemName: "moon.zzz.fill")
+                        .font(.system(size: 20))
+                        .foregroundStyle(.white)
+                }
+            }
+            .padding(16)
+            .background(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(Color.sleepPurple.opacity(0.12))
+            )
+        }
+
+        private var typicalWakeDate: Date {
+            let wakeHour   = UserDefaults.standard.object(forKey: "typicalWakeHour")   as? Double ?? 7.0
+            let wakeMinute = UserDefaults.standard.object(forKey: "typicalWakeMinute") as? Double ?? 0.0
+            let today = Calendar.current.startOfDay(for: Date())
+            return Calendar.current.date(
+                bySettingHour: Int(wakeHour), minute: Int(wakeMinute), second: 0, of: today
+            ) ?? Date()
+        }
+
 
     // MARK: Default Wake Time Warning Banner
 
@@ -996,6 +1052,7 @@ struct SleepListView: View {
     }
     
     // MARK: - Timeline Card
+
 
         private var todayTimelineCard: some View {
             VStack(alignment: .leading, spacing: 18) {
@@ -1420,6 +1477,8 @@ private extension Color {
 extension Notification.Name {
     static let sleepRecordsDidChange     = Notification.Name("sleepRecordsDidChange")
     static let dailyWakeRecordsDidChange = Notification.Name("dailyWakeRecordsDidChange")
+    static let babyProfileDidChange      = Notification.Name("babyProfileDidChange")   // ← YENİ
+
 }
 
 // MARK: - Button Style

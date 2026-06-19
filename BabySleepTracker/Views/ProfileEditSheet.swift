@@ -434,9 +434,9 @@ struct ProfileEditSheet: View {
         typicalBedMinute = Double(bedComps.minute  ?? 30)
 
         // Orchestrator'ı tetikle — yeni profil verisi ile snapshot yenile
-        Task { @MainActor in
-            SleepCoachOrchestrator.shared.generate()
-        }
+        // SleepListView .onReceive ile bu notification'ı dinleyip generate() çağırıyor.
+        NotificationCenter.default.post(name: .babyProfileDidChange, object: nil)
+        
         // Banner göster, kapat
         withAnimation { showSavedBanner = true }
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.8) {
