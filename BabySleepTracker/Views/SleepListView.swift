@@ -377,32 +377,30 @@ struct SleepListView: View {
             let wakeWindow = orchestrator.snapshot?.daytime.wakeWindowUsed ?? 180
             let expectedDuration = orchestrator.snapshot?.daytime.expectedDurationMinutes ?? 90
 
-            for slot in 0..<remainingSlots {
-                let totalSlots = expectedNapSlotCount
-                let remainingSlots = max(0, totalSlots - sortedNaps.count)
-
-                // Overdue durumunda tahmini slot gösterme —
-                // aşağıda "Nap missed" + "Next nap" zaten eklenecek
-                if !isNextNapOverdue {
-                    for slot in 0..<remainingSlots {
-                        // mevcut döngü içeriği aynen kalıyor
+            if !isNextNapOverdue {
+                for slot in 0..<remainingSlots {
+                    let predictedStart: Date
+                    if slot == 0 {
+                        predictedStart = nextNapTime
+                    } else {
+                        predictedStart = predictedAnchor.addingMinutes(wakeWindow)
                     }
+
+                    let awakeBefore = max(0, Int(predictedStart.timeIntervalSince(predictedAnchor) / 60))
+
+                    items.append(TimelineItem(
+                        icon: "moon.fill",
+                        iconColor: .sleepPurple.opacity(0.45),
+                        time: shortTime(predictedStart),
+                        title: "Nap \(sortedNaps.count + slot + 1)",
+                        detail: "~\(TimeFormat.minutes(expectedDuration)) expected",
+                        isActive: false,
+                        isFuture: true,
+                        awakeBeforeMinutes: awakeBefore
+                    ))
+
+                    predictedAnchor = predictedStart.addingMinutes(expectedDuration)
                 }
-
-                let awakeBefore = max(0, Int(predictedStart.timeIntervalSince(predictedAnchor) / 60))
-
-                items.append(TimelineItem(
-                    icon: "moon.fill",
-                    iconColor: .sleepPurple.opacity(0.45),
-                    time: shortTime(predictedStart),
-                    title: "Nap \(sortedNaps.count + slot + 1)",
-                    detail: "~\(TimeFormat.minutes(expectedDuration)) expected",
-                    isActive: false,
-                    isFuture: true,
-                    awakeBeforeMinutes: awakeBefore
-                ))
-
-                predictedAnchor = predictedStart.addingMinutes(expectedDuration)
             }
             
             // 3. Bedtime veya next nap
@@ -411,7 +409,6 @@ struct SleepListView: View {
             }
 
             if isNextNapOverdue {
-                // Geçmiş nap zamanı — turuncu "missed" node göster
                 let awakeBeforeMissed = lastNapEnd.map {
                     max(0, Int(nextNapTime.timeIntervalSince($0) / 60))
                 } ?? max(0, Int(nextNapTime.timeIntervalSince(wakeUp) / 60))
@@ -428,7 +425,9 @@ struct SleepListView: View {
                     isOverdue: true
                 ))
 
-                // Sonraki tahmini napı da ekle
+               
+                predictedAnchor = nextNapTime.addingMinutes(expectedDuration)
+
                 let awakeBeforeNext = max(0, Int(nextNapAfterMissed.timeIntervalSince(nextNapTime) / 60))
                 items.append(TimelineItem(
                     icon: "moon.fill",
