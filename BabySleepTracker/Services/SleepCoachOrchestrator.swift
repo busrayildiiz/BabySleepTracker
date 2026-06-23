@@ -11,25 +11,32 @@ enum NextSleepKind {
     case nap
     case bedtime
 }
+enum DataQuality {
+    case poor
+    case fair
+    case good
+    case excellent
+}
 
 struct OrchestratedSnapshot {
-    let generatedAt:       Date
-    let babyName:          String
-    let ageMonths:         Int
+       let generatedAt:        Date
+       let babyName:           String
+       let ageMonths:          Int
 
-    // Ajanlardan gelen çıktılar
-    let phase:             CoachPhase
-    let readiness:         PhaseReadinessReport
-    let pattern:           BabyPattern?
-    let daytime:           DaytimePrediction
-    let night:             NightPrediction
-    let transition:        NapTransitionAssessment
-    let insights:          SleepInsightBundle
+       // Ajanlardan gelen çıktılar
+       let phase:              CoachPhase
+       let readiness:          PhaseReadinessReport
+       let pattern:            BabyPattern?
+       let daytime:            DaytimePredictionAgent
+       let night:              NightPredictionAgent
+       let transition:         NapTransitionAssessment
+       let insights:           SleepInsightBundle
 
-    // Günlük uyku durumu
-    let todayTotalMinutes: Int
-    let sleepStatus:       DailySleepStatus
-    let nextSleepKind: NextSleepKind
+       // Günlük uyku durumu
+       let todayTotalMinutes:  Int
+       let sleepStatus:        DailySleepStatus
+       let nextSleepKind:      NextSleepKind
+
 
 }
 
@@ -66,7 +73,7 @@ final class SleepCoachOrchestrator: ObservableObject {
 
        init(
            phaseAgent:      PhaseAgentProtocol      = DefaultPhaseAgent(),
-           patternAgent:    PatternAgentProtocol     = DefaultPatternAgent(),
+           patternAgent:    PatternAgentProtocol     = PatternAgent(),
            daytimeAgent:    DaytimePredictionAgentProtocol = DefaultDaytimePredictionAgent(),
            nightAgent:      NightPredictionAgentProtocol   = DefaultNightPredictionAgent(),
            transitionAgent: NapTransitionAgentProtocol     = DefaultNapTransitionAgent(),
@@ -100,7 +107,6 @@ final class SleepCoachOrchestrator: ObservableObject {
            
            // 2. Temel metrikler
                  let breaks    = records.filter { $0.kind == .break }
-                 let dayNaps   = records.filter { $0.kind == .dayNap }
                  let todayRecs = records.filter { Calendar.current.isDateInToday($0.date) }
 
                  let trackedDays = countTrackedDays(
@@ -264,15 +270,15 @@ final class SleepCoachOrchestrator: ObservableObject {
             }
 
             private func loadAgeMonths(at date: Date) -> Int {
-                let birthDate: Date?
-                if let saved = UserDefaults.standard.object(forKey: "babyBirthDate") as? Date {
-                    birthDate = saved
-                } else if let seconds = UserDefaults.standard.object(forKey: "babyBirthDate") as? Double {
-                    birthDate = Date(timeIntervalSince1970: seconds)
+                let birthDateKey: Date?
+                if let saved = UserDefaults.standard.object(forKey: "birthDateKey") as? Date {
+                    birthDateKey = saved
+                } else if let seconds = UserDefaults.standard.object(forKey: "birthDateKey") as? Double {
+                    birthDateKey = Date(timeIntervalSince1970: seconds)
                 } else {
-                    birthDate = nil
+                    birthDateKey = nil
                 }
-                guard let birth = birthDate else { return 9 }
+                guard let birth = birthDateKey else { return 9 }
                 return max(0, Calendar.current.dateComponents([.month], from: birth, to: date).month ?? 9)
             }
 
@@ -295,6 +301,17 @@ final class SleepCoachOrchestrator: ObservableObject {
                 )
             }
     
+    // MARK: - Data Quality
+
+    private func quality(for days: Int) -> DataQuality {
+        switch days {
+        case 0...3:  return .poor
+        case 4...7:  return .fair
+        case 8...13: return .good
+        default:     return .excellent
+        }
+        
+    }
     // MARK: - LLM
 
     private func callLLM(

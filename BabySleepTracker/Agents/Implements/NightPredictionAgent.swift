@@ -9,7 +9,7 @@ import Foundation
 
 // MARK: - Night Prediction
 
-struct NightPrediction {
+struct NightPredictionAgent {
     let optimalBedtimeStart:      Date    // overtired olmadan en erken yatış
     let optimalBedtimeEnd:        Date    // bu saatten geç → overtired riski
     let overtiredRiskTime:        Date    // kesinlikle bu saatten önce yatır
@@ -30,7 +30,7 @@ protocol NightPredictionAgentProtocol {
         ageMonths:        Int,
         trackedDays:      Int,
         now:              Date
-    ) -> NightPrediction
+    ) -> NightPredictionAgent
 }
 
 // MARK: - DefaultNightPredictionAgent
@@ -60,7 +60,7 @@ final class DefaultNightPredictionAgent: NightPredictionAgentProtocol {
         ageMonths:    Int,
         trackedDays:  Int,
         now:          Date
-    ) -> NightPrediction {
+    ) -> NightPredictionAgent {
 
         let profile = profileProvider.profile(forAgeMonths: ageMonths)
         let breaks  = todayRecords.filter { $0.kind == .break }
@@ -134,7 +134,7 @@ final class DefaultNightPredictionAgent: NightPredictionAgentProtocol {
             sleepStatus:   sleepStatus
         )
 
-        return NightPrediction(
+        return NightPredictionAgent(
             optimalBedtimeStart:       bedtimeWindow.earliest,
             optimalBedtimeEnd:         bedtimeWindow.latest,
             overtiredRiskTime:         bedtimeWindow.overtiredRisk,

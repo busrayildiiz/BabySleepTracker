@@ -948,7 +948,7 @@ struct SleepListView: View {
                 title: "CONSISTENCY",
                 value: consistencyPercent > 80 ? "Good" : "Building",
                 subtitle: "\(consistencyPercent)% this week",
-                subtitleColor: Color.sleepGreen
+                subtitleColor: Color.green
             )
         }
     }
@@ -1020,7 +1020,7 @@ struct SleepListView: View {
                 HStack(spacing: 10) {
                     Image(systemName: "sunrise.fill")
                         .font(.system(size: 18))
-                        .foregroundStyle(Color.sleepSun)
+                        .foregroundStyle(Color.orange)
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Today's wake-up")
                             .font(.system(size: 13, weight: .semibold))
@@ -1320,10 +1320,10 @@ private struct WakeTimeEditorView: View {
         NavigationStack {
             VStack(spacing: 20) {
                 ZStack {
-                    Circle().fill(Color.sleepSun.opacity(0.12)).frame(width: 58, height: 58)
+                    Circle().fill(Color.orange.opacity(0.12)).frame(width: 58, height: 58)
                     Image(systemName: "sunrise.fill")
                         .font(.system(size: 27, weight: .semibold))
-                        .foregroundStyle(Color.sleepSun)
+                        .foregroundStyle(Color.orange)
                 }
                 VStack(spacing: 6) {
                     Text("When did your baby wake up?")
@@ -1376,7 +1376,7 @@ private struct MoonHeaderArt: View {
             ZStack {
                 Image(systemName: "star.fill")
                     .font(.system(size: s * 0.16, weight: .semibold))
-                    .foregroundStyle(Color.sleepSun.opacity(0.85))
+                    .foregroundStyle(Color.orange.opacity(0.85))
                     .position(x: w * 0.88, y: h * 0.20)
                 Image(systemName: "sparkle")
                     .font(.system(size: s * 0.13, weight: .bold))
@@ -1455,11 +1455,10 @@ private extension Color {
        static let sleepPurple     = Color("sleepPurple")
        static let sleepPurpleDeep = Color("sleepPurpleDeep")
        static let sleepLilac      = Color("sleepLilac")
-       static let sleepSun        = Color("sleepSun")
        static let sleepCloud      = Color("sleepCloud")
-       static let sleepGreen      = Color("sleepGreen")
-       static let sleepStroke     = Color("sleepStroke")
        static let sleepWarmCard   = Color("sleepWarmCard")
+       static let sleepStroke = Color("sleepStroke")
+
 
     init(hex: Int, opacity: Double = 1) {
         self.init(
