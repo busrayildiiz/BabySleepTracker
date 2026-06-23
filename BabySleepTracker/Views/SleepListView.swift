@@ -240,10 +240,15 @@ struct SleepListView: View {
     }
 
     private var nextNapTime: Date {
-        if let t = orchestrator.snapshot?.daytime.nextNapTime { return t }
-        return Calendar.current.date(
-            byAdding: .minute, value: recommendedWakeWindowMinutes, to: nextNapAnchor
-        ) ?? Date()
+        // Her zaman snapshot'tan al, snapshot yoksa fallback
+        guard let snapshotTime = orchestrator.snapshot?.daytime.nextNapTime else {
+            return Calendar.current.date(
+                byAdding: .minute,
+                value: recommendedWakeWindowMinutes,
+                to: nextNapAnchor
+            ) ?? Date()
+        }
+        return snapshotTime
     }
 
     private var confidencePercent: Int {
@@ -269,7 +274,8 @@ struct SleepListView: View {
     
     private var isNextNapOverdue: Bool {
         guard orchestrator.snapshot?.nextSleepKind == .nap else { return false }
-        return nextNapTime < Date()
+        guard let napTime = orchestrator.snapshot?.daytime.nextNapTime else { return false }
+        return napTime < Date()
     }
     // Nap atlandıysa, bir sonraki tahmini napı hesapla
     private var nextNapAfterMissed: Date {

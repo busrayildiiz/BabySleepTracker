@@ -188,17 +188,16 @@ final class SleepCoachOrchestrator: ObservableObject {
            let expectedNaps = profile.expectedNapCount
 
            let nextSleepKind: NextSleepKind = {
-               // Henüz minimum nap sayısına ulaşılmadıysa kesinlikle nap
-               if todayDayNapsCount < expectedNaps.lowerBound {
-                   return .nap
-               }
-               // Maksimum nap sayısına ulaşıldıysa kesinlikle bedtime
+               // Cutoff saatini her zaman önce kontrol et
+               // Cutoff geçtiyse nap sayısından bağımsız olarak bedtime
+               let cutoff = overtiredCalc.lastNapCutoffTime(ageMonths: ageMonths, on: now)
+               guard now < cutoff else { return .bedtime }
+
+               // Cutoff geçmediyse nap sayısına bak
                if todayDayNapsCount >= expectedNaps.upperBound {
                    return .bedtime
                }
-               // Aradaysa — son nap cutoff saatine bak
-               let cutoff = overtiredCalc.lastNapCutoffTime(ageMonths: ageMonths, on: now)
-               return now < cutoff ? .nap : .bedtime
+               return .nap
            }()
 
                 // 7. Nap transition
