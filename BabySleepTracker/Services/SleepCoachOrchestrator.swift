@@ -100,7 +100,13 @@ final class SleepCoachOrchestrator: ObservableObject {
            defer { isLoading = false }
 
            // 1. Veriyi yükle
-           let records     = loadRecords()
+           let rawRecords = loadRecords()
+           let cleanedRecords = closeStaleOngoingRecords(rawRecords, now: now)
+           if cleanedRecords.contains(where: { !$0.isOngoing }) !=
+              rawRecords.contains(where: { !$0.isOngoing }) {
+               saveRecords(cleanedRecords)
+           }
+           let records = cleanedRecords
            let wakeRecords = loadWakeRecords()
            let babyName    = loadBabyName()
            let ageMonths   = loadAgeMonths(at: now)
@@ -255,6 +261,58 @@ final class SleepCoachOrchestrator: ObservableObject {
                 else { return [] }
                 return decoded
             }
+    private func closeStaleOngoingRecords(
+        _ records: [SleepRecord],
+        now: Date
+    ) -> [SleepRecord] {
+        let calendar = Calendar.current
+        let wakeHour   = UserDefaults.standard.object(forKey: "typicalWakeHour")   as? Double ?? 7.0
+        let wakeMinute = UserDefaults.standard.object(forKey: "typicalWakeMinute") as? Double ?? 0.0
+
+        let today = calendar.startOfDay(for: now)
+        let typicalWake = calendar.date(
+            bySettingHour:   Int(wakeHour),
+            minute:          Int(wakeMinute),
+            second:          0,
+            of:              today
+        ) ?? today
+
+        return records.map { record in
+            guard record.isOngoing else { return record }
+
+            let startedToday = calendar.isDate(record.date, inSameDayAs: now)
+
+            let shouldClose: Bool
+            if !startedToday {
+                // Farklı bir günde başlamış → kesinlikle kapat
+                shouldClose = true
+            } else {
+                // Bugün başlamış ama tipik uyanma saati geçtiyse kapat
+                shouldClose = now >= typicalWake
+            }
+
+            guard shouldClose else { return record }
+
+            // Makul bir süre hesapla
+            let rawMinutes = Int(now.timeIntervalSince(record.date) / 60)
+            let maxMinutes: Int
+            switch record.kind {
+            case .nightSleep: maxMinutes = 12 * 60   // max 12 saat
+            case .dayNap:     maxMinutes = 3  * 60   // max 3 saat
+            default:          maxMinutes = 60
+            }
+            let duration = min(rawMinutes, maxMinutes)
+
+            return SleepRecord(
+                id:          record.id,
+                date:        record.date,
+                duration:    duration,
+                kind:        record.kind,
+                parentNapID: record.parentNapID,
+                isOngoing:   false              // ← kapatıldı
+            )
+        }
+    }
 
             private func loadWakeRecords() -> [DailyWakeRecord] {
                 guard let data = UserDefaults.standard.data(forKey: "dailyWakeRecords_v1"),
@@ -301,6 +359,14 @@ final class SleepCoachOrchestrator: ObservableObject {
                 )
             }
     
+    // MARK: - Save Records
+    
+    private func saveRecords(_ records: [SleepRecord]) {
+        guard let data = try? JSONEncoder().encode(records) else { return }
+        UserDefaults.standard.set(data, forKey: "sleepRecords")
+        // View'ları tetikle
+        NotificationCenter.default.post(name: .sleepRecordsDidChange, object: nil)
+    }
     // MARK: - Data Quality
 
     private func quality(for days: Int) -> DataQuality {
@@ -428,6 +494,7 @@ final class SleepCoachOrchestrator: ObservableObject {
     func refreshLLM() {
         guard let current = snapshot else { return }
         let records = loadRecords()
+
         Task {
             await callLLM(
                 snapshot: current,
