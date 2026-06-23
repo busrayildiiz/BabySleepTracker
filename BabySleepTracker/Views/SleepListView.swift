@@ -378,12 +378,15 @@ struct SleepListView: View {
             let expectedDuration = orchestrator.snapshot?.daytime.expectedDurationMinutes ?? 90
 
             for slot in 0..<remainingSlots {
-                // İlk tahmini slot gerçek "next nap" tahminini kullanır (daha hassas, anchor mantığı doğru)
-                let predictedStart: Date
-                if slot == 0 {
-                    predictedStart = nextNapTime
-                } else {
-                    predictedStart = predictedAnchor.addingMinutes(wakeWindow)
+                let totalSlots = expectedNapSlotCount
+                let remainingSlots = max(0, totalSlots - sortedNaps.count)
+
+                // Overdue durumunda tahmini slot gösterme —
+                // aşağıda "Nap missed" + "Next nap" zaten eklenecek
+                if !isNextNapOverdue {
+                    for slot in 0..<remainingSlots {
+                        // mevcut döngü içeriği aynen kalıyor
+                    }
                 }
 
                 let awakeBefore = max(0, Int(predictedStart.timeIntervalSince(predictedAnchor) / 60))
