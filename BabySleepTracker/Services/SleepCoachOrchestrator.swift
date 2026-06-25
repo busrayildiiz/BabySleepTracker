@@ -94,163 +94,163 @@ final class SleepCoachOrchestrator: ObservableObject {
        }
 
        // MARK: - Generate Snapshot
+    func generate(now: Date = Date()) {
+        isLoading = true
+        defer { isLoading = false }
 
-       func generate(now: Date = Date()) {
-           isLoading = true
-           defer { isLoading = false }
+        // 1. Veriyi yükle ve stale ongoing kayıtları temizle
+        let rawRecords     = loadRecords()
+        let records        = closeStaleOngoingRecords(rawRecords, now: now)
 
-           // 1. Veriyi yükle
-           let rawRecords = loadRecords()
-           let cleanedRecords = closeStaleOngoingRecords(rawRecords, now: now)
-           if cleanedRecords.contains(where: { !$0.isOngoing }) !=
-              rawRecords.contains(where: { !$0.isOngoing }) {
-               saveRecords(cleanedRecords)
-           }
-           let records = cleanedRecords
-           let wakeRecords = loadWakeRecords()
-           let babyName    = loadBabyName()
-           let ageMonths   = loadAgeMonths(at: now)
-           
-           // 2. Temel metrikler
-                 let breaks    = records.filter { $0.kind == .break }
-                 let todayRecs = records.filter { Calendar.current.isDateInToday($0.date) }
+        let hasChanges = zip(rawRecords, records).contains { old, new in
+            old.isOngoing != new.isOngoing || old.duration != new.duration
+        }
+        if hasChanges {
+            saveRecords(records)
+            NotificationCenter.default.post(name: .sleepRecordsDidChange, object: nil)
+        }
 
-                 let trackedDays = countTrackedDays(
-                     records:     records,
-                     wakeRecords: wakeRecords
-                 )
+        let wakeRecords = loadWakeRecords()
+        let babyName    = loadBabyName()
+        let ageMonths   = loadAgeMonths(at: now)
 
-                 let todayTotal = todayRecs
-                     .filter { $0.kind != .break }
-                     .reduce(0) { $0 + $1.totalMinutes(breaks: breaks) }
+        // 2. Temel metrikler
+        let breaks    = records.filter { $0.kind == .break }
+        let todayRecs = records.filter { Calendar.current.isDateInToday($0.date) }
 
-                 // 3. Phase
-                 let phase    = phaseAgent.currentPhase(
-                     ageMonths:   ageMonths,
-                     trackedDays: trackedDays
-                 )
+        let trackedDays = countTrackedDays(
+            records:     records,
+            wakeRecords: wakeRecords
+        )
 
-                 // Wake time ve gece uykusu sinyalleri
-                 let hasTodayWake = wakeRecords.contains {
-                     Calendar.current.isDateInToday($0.day)
-                 }
-                 let hasYesterdayNight: Bool = {
-                     guard let yesterday = Calendar.current.date(
-                         byAdding: .day, value: -1, to: now
-                     ) else { return false }
-                     return records.contains {
-                         $0.kind == .nightSleep &&
-                         Calendar.current.isDate($0.date, inSameDayAs: yesterday)
-                     }
-                 }()
-                let readiness = phaseAgent.readinessReport(
-                    ageMonths:            ageMonths,
-                    trackedDays:          trackedDays,
-                    hasTodayWakeTime:     hasTodayWake,
-                    hasYesterdayNightSleep: hasYesterdayNight
-                )
+        let todayTotal = todayRecs
+            .filter { $0.kind != .break }
+            .reduce(0) { $0 + $1.totalMinutes(breaks: breaks) }
 
-                // 4. Pattern — tooYoung değilse analiz et
-                let pattern: BabyPattern?
-                if case .tooYoung = phase {
-                    pattern = nil
-                } else {
-                    pattern = patternAgent.analyze(
-                        records:     records,
-                        wakeRecords: wakeRecords,
-                        ageMonths:   ageMonths,
-                        now:         now
-                    )
-                }
+        // 3. Phase
+        let phase = phaseAgent.currentPhase(
+            ageMonths:   ageMonths,
+            trackedDays: trackedDays
+        )
 
-                // 5. Daytime prediction
-                let daytime = daytimeAgent.predictNextNap(
-                    pattern:      pattern,
-                    todayRecords: todayRecs,
-                    wakeRecords:  wakeRecords,
-                    ageMonths:    ageMonths,
-                    trackedDays:  trackedDays,
-                    now:          now
-                )
+        // Wake time ve gece uykusu sinyalleri
+        let hasTodayWake = wakeRecords.contains {
+            Calendar.current.isDateInToday($0.day)
+        }
+        let hasYesterdayNight: Bool = {
+            guard let yesterday = Calendar.current.date(
+                byAdding: .day, value: -1, to: now
+            ) else { return false }
+            return records.contains {
+                $0.kind == .nightSleep &&
+                Calendar.current.isDate($0.date, inSameDayAs: yesterday)
+            }
+        }()
 
-                // 6. Night prediction
-                let night = nightAgent.predictBedtime(
-                    pattern:      pattern,
-                    todayRecords: todayRecs,
-                    wakeRecords:  wakeRecords,
-                    ageMonths:    ageMonths,
-                    trackedDays:  trackedDays,
-                    now:          now
-                )
-           
-           let todayDayNapsCount = todayRecs.filter { $0.kind == .dayNap }.count
-           let profile = profileProvider.profile(forAgeMonths: ageMonths)
-           let expectedNaps = profile.expectedNapCount
+        let readiness = phaseAgent.readinessReport(
+            ageMonths:              ageMonths,
+            trackedDays:            trackedDays,
+            hasTodayWakeTime:       hasTodayWake,
+            hasYesterdayNightSleep: hasYesterdayNight
+        )
 
-           let nextSleepKind: NextSleepKind = {
-               // Cutoff saatini her zaman önce kontrol et
-               // Cutoff geçtiyse nap sayısından bağımsız olarak bedtime
-               let cutoff = overtiredCalc.lastNapCutoffTime(ageMonths: ageMonths, on: now)
-               guard now < cutoff else { return .bedtime }
+        // 4. Pattern — tooYoung değilse analiz et
+        let pattern: BabyPattern?
+        if case .tooYoung = phase {
+            pattern = nil
+        } else {
+            pattern = patternAgent.analyze(
+                records:     records,
+                wakeRecords: wakeRecords,
+                ageMonths:   ageMonths,
+                now:         now
+            )
+        }
 
-               // Cutoff geçmediyse nap sayısına bak
-               if todayDayNapsCount >= expectedNaps.upperBound {
-                   return .bedtime
-               }
-               return .nap
-           }()
+        // 5. Daytime prediction
+        let daytime = daytimeAgent.predictNextNap(
+            pattern:      pattern,
+            todayRecords: todayRecs,
+            wakeRecords:  wakeRecords,
+            ageMonths:    ageMonths,
+            trackedDays:  trackedDays,
+            now:          now
+        )
 
-                // 7. Nap transition
-                let transition = transitionAgent.assess(
-                    records:     records,
-                    wakeRecords: wakeRecords,
-                    ageMonths:   ageMonths,
-                    now:         now
-                )
+        // 6. Night prediction
+        let night = nightAgent.predictBedtime(
+            pattern:      pattern,
+            todayRecords: todayRecs,
+            wakeRecords:  wakeRecords,
+            ageMonths:    ageMonths,
+            trackedDays:  trackedDays,
+            now:          now
+        )
 
-                // 8. Insights
-                let insights = insightAgent.buildInsights(
-                    phase:       phase,
-                    pattern:     pattern,
-                    trackedDays: trackedDays,
-                    babyName:    babyName
-                )
+        // 7. nextSleepKind
+        let todayDayNapsCount = todayRecs.filter { $0.kind == .dayNap }.count
+        let profile           = profileProvider.profile(forAgeMonths: ageMonths)
+        let expectedNaps      = profile.expectedNapCount
 
-                // 9. Sleep status
-                let sleepStatus = overtiredCalc.dailySleepStatus(
-                    totalMinutes: todayTotal,
-                    ageMonths:    ageMonths
-                )
+        let nextSleepKind: NextSleepKind = {
+            let cutoff = overtiredCalc.lastNapCutoffTime(ageMonths: ageMonths, on: now)
+            guard now < cutoff else { return .bedtime }
+            if todayDayNapsCount >= expectedNaps.upperBound { return .bedtime }
+            return .nap
+        }()
 
-                // 10. Snapshot oluştur
-                let result = OrchestratedSnapshot(
-                    generatedAt:       now,
-                    babyName:          babyName,
-                    ageMonths:         ageMonths,
-                    phase:             phase,
-                    readiness:         readiness,
-                    pattern:           pattern,
-                    daytime:           daytime,
-                    night:             night,
-                    transition:        transition,
-                    insights:          insights,
-                    todayTotalMinutes: todayTotal,
-                    sleepStatus:       sleepStatus,
-                    nextSleepKind: nextSleepKind
-                )
-                self.snapshot = result 
-                let trigger = determineTrigger(
-                    records:    records,
-                    snapshot:   result,
-                    previous:   snapshot)
-           
-           if trigger != nil {
-               Task {
-                   await callLLM(snapshot: result, records: records, trigger: trigger!)
-               }
-           }
-         
-       }
+        // 8. Nap transition
+        let transition = transitionAgent.assess(
+            records:     records,
+            wakeRecords: wakeRecords,
+            ageMonths:   ageMonths,
+            now:         now
+        )
+
+        // 9. Insights
+        let insights = insightAgent.buildInsights(
+            phase:       phase,
+            pattern:     pattern,
+            trackedDays: trackedDays,
+            babyName:    babyName
+        )
+
+        // 10. Sleep status
+        let sleepStatus = overtiredCalc.dailySleepStatus(
+            totalMinutes: todayTotal,
+            ageMonths:    ageMonths
+        )
+
+        // 11. Snapshot oluştur
+        let result = OrchestratedSnapshot(
+            generatedAt:       now,
+            babyName:          babyName,
+            ageMonths:         ageMonths,
+            phase:             phase,
+            readiness:         readiness,
+            pattern:           pattern,
+            daytime:           daytime,
+            night:             night,
+            transition:        transition,
+            insights:          insights,
+            todayTotalMinutes: todayTotal,
+            sleepStatus:       sleepStatus,
+            nextSleepKind:     nextSleepKind
+        )
+        self.snapshot = result
+
+        let trigger = determineTrigger(
+            records:  records,
+            snapshot: result,
+            previous: snapshot
+        )
+
+        if let trigger {
+            Task {
+                await callLLM(snapshot: result, records: records, trigger: trigger)
+            }
+        }
+    }
 
             // MARK: - Data Loaders
 
