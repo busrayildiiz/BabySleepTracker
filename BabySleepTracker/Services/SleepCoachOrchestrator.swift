@@ -285,9 +285,18 @@ final class SleepCoachOrchestrator: ObservableObject {
             if !startedToday {
                 // Farklı bir günde başlamış → kesinlikle kapat
                 shouldClose = true
-            } else {
-                // Bugün başlamış ama tipik uyanma saati geçtiyse kapat
-                shouldClose = now >= typicalWake
+            }  else {
+                // Bugün başlamış — sadece yarının typicalWake saatini geç
+                guard let tomorrow = Calendar.current.date(byAdding: .day, value: 1, to: Calendar.current.startOfDay(for: now)) else {
+                    return record
+                }
+                let tomorrowWake = Calendar.current.date(
+                    bySettingHour: Int(wakeHour),
+                    minute: Int(wakeMinute),
+                    second: 0,
+                    of: tomorrow
+                ) ?? tomorrow
+                shouldClose = now >= tomorrowWake
             }
 
             guard shouldClose else { return record }

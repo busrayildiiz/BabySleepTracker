@@ -576,23 +576,17 @@ struct SleepListView: View {
                 VStack(spacing: 12) {
                     headerSection
                     nextNapOrBedtimeCard
-                    if usingDefaultWakeTime {
+                    if usingDefaultWakeTime && !isStillInNightSleep {
                         defaultWakeTimeWarningBanner
                     }
-
-                    if orchestrator.snapshot?.nextSleepKind == .nap {
+                    if orchestrator.snapshot?.nextSleepKind == .nap && !isStillInNightSleep {
                         bedtimeWindowCard
                     }
-                    todayTimelineCard
-                    coachInsightCard
-                    todayWakeUpCard
-
-
-                    totalSleepCard
-                    
-
-                  
-                    statsRow
+                       todayTimelineCard
+                       coachInsightCard
+                       todayWakeUpCard
+                       totalSleepCard
+                       statsRow
 
                     if !records.isEmpty { recentDaysSection }
                 }
@@ -746,20 +740,21 @@ struct SleepListView: View {
     }
     
     // Henüz typical wake time gelmediyse ve bugün hiç kayıt yoksa, bebek hâlâ gece uykusunda kabul edilir
-        private var isStillInNightSleep: Bool {
-            guard todayWakeRecord == nil, todaySleeps.isEmpty else { return false }
-
-            let wakeHour   = UserDefaults.standard.object(forKey: "typicalWakeHour")   as? Double ?? 7.0
-            let wakeMinute = UserDefaults.standard.object(forKey: "typicalWakeMinute") as? Double ?? 0.0
-
-            let today = Calendar.current.startOfDay(for: Date())
-            let typicalWake = Calendar.current.date(
-                bySettingHour: Int(wakeHour), minute: Int(wakeMinute), second: 0, of: today
-            ) ?? Date()
-
-            return Date() < typicalWake
+    private var isStillInNightSleep: Bool {
+        // Case 1: Ongoing night sleep kaydı var
+        if todayRecords.contains(where: { $0.kind == .nightSleep && $0.isOngoing }) {
+            return true
         }
-
+        // Case 2: Hiç kayıt yok ve typicalWakeHour henüz gelmedi
+        guard todayWakeRecord == nil, todaySleeps.isEmpty else { return false }
+        let wakeHour   = UserDefaults.standard.object(forKey: "typicalWakeHour")   as? Double ?? 7.0
+        let wakeMinute = UserDefaults.standard.object(forKey: "typicalWakeMinute") as? Double ?? 0.0
+        let today = Calendar.current.startOfDay(for: Date())
+        let typicalWake = Calendar.current.date(
+            bySettingHour: Int(wakeHour), minute: Int(wakeMinute), second: 0, of: today
+        ) ?? Date()
+        return Date() < typicalWake
+    }
     // MARK: next nap or bedtime?
 
         @ViewBuilder
@@ -828,36 +823,6 @@ struct SleepListView: View {
             .buttonStyle(CardPressButtonStyle())
         }
 
-        // MARK: Still Sleeping Card (gece, henüz wake time gelmedi)
-
-        private var stillSleepingCard: some View {
-            HStack(spacing: 12) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("STILL ASLEEP")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(Color.sleepPurpleDeep)
-                    Text("Sleeping")
-                        .font(.system(size: 26, weight: .medium, design: .rounded))
-                        .foregroundStyle(.primary)
-                    Text("Expected to wake around \(shortTime(typicalWakeDate))")
-                        .font(.system(size: 12))
-                        .foregroundStyle(Color.sleepPurpleDeep.opacity(0.8))
-                }
-                Spacer()
-                ZStack {
-                    Circle().fill(Color.sleepPurpleDeep).frame(width: 46, height: 46)
-                    Image(systemName: "moon.zzz.fill")
-                        .font(.system(size: 20))
-                        .foregroundStyle(.white)
-                }
-            }
-            .padding(16)
-            .background(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .fill(Color.sleepPurple.opacity(0.12))
-            )
-        }
-
         private var typicalWakeDate: Date {
             let wakeHour   = UserDefaults.standard.object(forKey: "typicalWakeHour")   as? Double ?? 7.0
             let wakeMinute = UserDefaults.standard.object(forKey: "typicalWakeMinute") as? Double ?? 0.0
@@ -867,6 +832,292 @@ struct SleepListView: View {
             ) ?? Date()
         }
 
+    // MARK: - Night Watch Card
+    // Bu kart isStillInNightSleep == true olduğunda gösterilir.
+    // stillSleepingCard'ın yerine geçer.
+    private var stillSleepingCard: some View {
+        NightWatchCard(
+            ongoingNight: todayRecords.first { $0.kind == .nightSleep && $0.isOngoing },
+            expectedWakeTime: typicalWakeDate
+        )
+    }
+    // MARK: - NightWatchCard Component
+
+    struct NightWatchCard: View {
+
+        let ongoingNight: SleepRecord?
+        let expectedWakeTime: Date
+
+        @State private var pulse = false
+        @State private var starOpacity1: Double = 0.3
+        @State private var starOpacity2: Double = 0.6
+        @State private var starOpacity3: Double = 0.2
+
+        private let deepPurple = Color(red: 0.18, green: 0.12, blue: 0.45)
+        private let midPurple  = Color(red: 0.32, green: 0.22, blue: 0.72)
+        private let lilac      = Color(red: 0.72, green: 0.65, blue: 0.98)
+        private let gold       = Color(red: 1.0,  green: 0.80, blue: 0.30)
+
+        // Başlangıç saati
+        private var startTime: Date {
+            ongoingNight?.date ?? Calendar.current.date(
+                byAdding: .hour, value: -9, to: expectedWakeTime
+            ) ?? Date()
+        }
+
+        // Geçen süre (dk)
+        private var elapsedMinutes: Int {
+            max(0, Int(Date().timeIntervalSince(startTime) / 60))
+        }
+
+        // Beklenen toplam gece uykusu (dk) — 10 saat default
+        private var expectedMinutes: Int {
+            max(1, Int(expectedWakeTime.timeIntervalSince(startTime) / 60))
+        }
+
+        // Progress 0.0 – 1.0
+        private var progress: Double {
+            min(1.0, Double(elapsedMinutes) / Double(expectedMinutes))
+        }
+
+        // Confidence benzeri yüzde — geçen/beklenen
+        private var progressPercent: Int {
+            Int(progress * 100)
+        }
+
+        var body: some View {
+            ZStack {
+                // Arka plan gradient
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color(red: 0.12, green: 0.08, blue: 0.35),
+                                Color(red: 0.08, green: 0.05, blue: 0.25)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+
+                // Yıldız texture
+                starsLayer
+
+                // İçerik
+                VStack(spacing: 0) {
+                    topRow
+                    Divider()
+                        .background(Color.white.opacity(0.08))
+                        .padding(.horizontal, 16)
+                    bottomRow
+                }
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .stroke(midPurple.opacity(0.4), lineWidth: 1)
+            )
+            .shadow(color: deepPurple.opacity(0.6), radius: 16, x: 0, y: 8)
+            .onAppear {
+                pulse = true
+                withAnimation(.easeInOut(duration: 2.1).repeatForever(autoreverses: true)) {
+                    starOpacity1 = 0.9
+                }
+                withAnimation(.easeInOut(duration: 1.6).repeatForever(autoreverses: true).delay(0.4)) {
+                    starOpacity2 = 0.2
+                }
+                withAnimation(.easeInOut(duration: 2.5).repeatForever(autoreverses: true).delay(0.9)) {
+                    starOpacity3 = 0.8
+                }
+            }
+        }
+
+        // MARK: - Top Row
+
+        private var topRow: some View {
+            HStack(alignment: .center, spacing: 16) {
+
+                // Sol: başlangıç saati + beklenen uyanış
+                VStack(alignment: .leading, spacing: 6) {
+
+                    // "CURRENT SLEEP SESSION" etiketi
+                    HStack(spacing: 5) {
+                        Circle()
+                            .fill(lilac)
+                            .frame(width: 6, height: 6)
+                            .scaleEffect(pulse ? 1.4 : 0.8)
+                            .animation(
+                                .easeInOut(duration: 0.9).repeatForever(autoreverses: true),
+                                value: pulse
+                            )
+                        Text("CURRENT SLEEP SESSION")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundStyle(lilac)
+                            .tracking(0.5)
+                    }
+
+                    // Başlangıç saati
+                    TimelineView(.periodic(from: .now, by: 60)) { _ in
+                        Text("Started \(ampm(startTime))")
+                            .font(.system(size: 22, weight: .bold, design: .rounded))
+                            .foregroundStyle(Color.white)
+                            .monospacedDigit()
+                    }
+
+                    // Beklenen uyanış
+                    HStack(spacing: 4) {
+                        Image(systemName: "sunrise.fill")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(gold)
+                        Text("Expected wake around \(ampm(expectedWakeTime))")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(gold)
+                    }
+                }
+
+                Spacer()
+
+                // Sağ: dairesel progress
+                circularProgress
+            }
+            .padding(.horizontal, 18)
+            .padding(.top, 18)
+            .padding(.bottom, 14)
+        }
+
+        // MARK: - Circular Progress
+
+        private var circularProgress: some View {
+            ZStack {
+                // Track
+                Circle()
+                    .stroke(Color.white.opacity(0.10), lineWidth: 5)
+                    .frame(width: 72, height: 72)
+
+                // Progress arc
+                Circle()
+                    .trim(from: 0, to: progress)
+                    .stroke(
+                        AngularGradient(
+                            colors: [lilac.opacity(0.6), lilac, Color.white],
+                            center: .center
+                        ),
+                        style: StrokeStyle(lineWidth: 5, lineCap: .round)
+                    )
+                    .frame(width: 72, height: 72)
+                    .rotationEffect(.degrees(-90))
+                    .animation(.easeInOut(duration: 1.0), value: progress)
+
+                // İçerik
+                VStack(spacing: 1) {
+                    TimelineView(.periodic(from: .now, by: 60)) { _ in
+                        Text("\(progressPercent)%")
+                            .font(.system(size: 17, weight: .bold, design: .rounded))
+                            .foregroundStyle(Color.white)
+                            .monospacedDigit()
+                    }
+                    Text("of night")
+                        .font(.system(size: 8, weight: .semibold))
+                        .foregroundStyle(lilac.opacity(0.7))
+                }
+            }
+        }
+
+        // MARK: - Bottom Row
+
+        private var bottomRow: some View {
+            HStack(spacing: 8) {
+                // Sol: geçen süre
+                HStack(spacing: 6) {
+                    Image(systemName: "waveform.path")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(lilac.opacity(0.7))
+
+                    TimelineView(.periodic(from: .now, by: 60)) { _ in
+                        Text("Sleeping… \(TimeFormat.minutes(elapsedMinutes))")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(lilac.opacity(0.85))
+                    }
+                }
+
+                Spacer()
+
+                // Sağ: kalan süre
+                TimelineView(.periodic(from: .now, by: 60)) { _ in
+                    let remaining = max(0, expectedMinutes - elapsedMinutes)
+                    Text(remaining > 0 ? "~\(TimeFormat.minutes(remaining)) left" : "Wake time soon")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(remaining > 0 ? lilac.opacity(0.6) : gold)
+                }
+            }
+            .padding(.horizontal, 18)
+            .padding(.vertical, 12)
+        }
+
+        // MARK: - Stars
+
+        private var starsLayer: some View {
+            GeometryReader { geo in
+                let w = geo.size.width
+                let h = geo.size.height
+                ZStack {
+                    Circle()
+                        .fill(Color.white)
+                        .frame(width: 2.5, height: 2.5)
+                        .position(x: w * 0.15, y: h * 0.22)
+                        .opacity(starOpacity1)
+
+                    Circle()
+                        .fill(Color.white)
+                        .frame(width: 1.5, height: 1.5)
+                        .position(x: w * 0.75, y: h * 0.15)
+                        .opacity(starOpacity2)
+
+                    Circle()
+                        .fill(Color.white)
+                        .frame(width: 2, height: 2)
+                        .position(x: w * 0.88, y: h * 0.40)
+                        .opacity(starOpacity3)
+
+                    Circle()
+                        .fill(Color.white)
+                        .frame(width: 1.5, height: 1.5)
+                        .position(x: w * 0.25, y: h * 0.70)
+                        .opacity(starOpacity2)
+
+                    Circle()
+                        .fill(Color.white)
+                        .frame(width: 1, height: 1)
+                        .position(x: w * 0.60, y: h * 0.25)
+                        .opacity(starOpacity1)
+
+                    // Ay ikonu
+                    Image(systemName: "moon.stars.fill")
+                        .font(.system(size: 56, weight: .thin))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [
+                                    Color.white.opacity(0.06),
+                                    Color.white.opacity(0.03)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .position(x: w * 0.82, y: h * 0.38)
+                }
+            }
+        }
+
+        // MARK: - Helper
+
+        private func ampm(_ date: Date) -> String {
+            let f = DateFormatter()
+            f.locale = Locale(identifier: "en_US_POSIX")
+            f.dateFormat = "h:mm a"
+            return f.string(from: date)
+        }
+    }
 
     // MARK: Default Wake Time Warning Banner
 
