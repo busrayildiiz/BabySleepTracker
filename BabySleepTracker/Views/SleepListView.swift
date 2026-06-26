@@ -766,72 +766,213 @@ struct SleepListView: View {
             }
         }
 
- 
+    // MARK: - Regular Next Nap / Bedtime Card
 
-        // MARK: Regular Next Nap / Bedtime Card
+    private var regularNextNapOrBedtimeCard: some View {
+        let isBedtime = orchestrator.snapshot?.nextSleepKind == .bedtime
+        let isOverdue = isNextNapOverdue
+        let displayTime = isBedtime
+            ? (orchestrator.snapshot?.night.optimalBedtimeStart ?? nextNapTime)
+            : nextNapTime
 
-        private var regularNextNapOrBedtimeCard: some View {
-            let isBedtime = orchestrator.snapshot?.nextSleepKind == .bedtime
-            let isOverdue = isNextNapOverdue
-            let displayTime = isBedtime
-                ? (orchestrator.snapshot?.night.optimalBedtimeStart ?? nextNapTime)
-                : nextNapTime
-            let icon = isBedtime ? "moon.stars.fill" : (isOverdue ? "exclamationmark.triangle.fill" : "moon.fill")
-            let label = isBedtime ? "BEDTIME" : (isOverdue ? "NAP WINDOW PASSED" : "NEXT NAP")
-            let accentColor: Color = isOverdue ? .orange : Color.sleepPurpleDeep
-            let backgroundTint: Color = isOverdue ? .orange.opacity(0.12) : Color.sleepPurple.opacity(0.12)
+        return Button {
+            activeSheet = .addSleep(editing: nil, defaultDate: isOverdue ? Date() : displayTime)
+        } label: {
+            NextSleepCard(
+                isBedtime:            isBedtime,
+                isOverdue:            isOverdue,
+                displayTime:          displayTime,
+                recommendationWindow: recommendationWindow,
+                confidencePercent:    confidencePercent
+            )
+        }
+        .buttonStyle(CardPressButtonStyle())
+    }
 
-            return Button {
-                activeSheet = .addSleep(editing: nil, defaultDate: isOverdue ? Date() : displayTime)
-            } label: {
-                HStack(spacing: 12) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(label)
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(accentColor)
-                        Text(isOverdue ? "Add nap now" : shortTime(displayTime))
-                            .font(.system(size: 26, weight: .medium, design: .rounded))
-                            .foregroundStyle(.primary)
-                        Text(isOverdue
-                             ? "Expected around \(shortTime(displayTime)) — baby may be overtired"
-                             : "Window: \(recommendationWindow)")
-                            .font(.system(size: 12))
-                            .foregroundStyle(accentColor.opacity(0.8))
-                    }
-                    Spacer()
-                    VStack(spacing: 4) {
-                        ZStack {
-                            Circle().fill(accentColor).frame(width: 46, height: 46)
-                            Image(systemName: icon)
-                                .font(.system(size: 20))
-                                .foregroundStyle(.white)
-                        }
-                        if !isOverdue {
-                            Text("\(confidencePercent)% conf.")
-                                .font(.system(size: 11, weight: .semibold))
+    // MARK: - NextSleepCard Component
+
+    struct NextSleepCard: View {
+        let isBedtime:            Bool
+        let isOverdue:            Bool
+        let displayTime:          Date
+        let recommendationWindow: String
+        let confidencePercent:    Int
+
+        // MARK: - State colours
+
+        private var gradientColors: [Color] {
+            if isOverdue {
+                return [
+                    Color(red: 0.55, green: 0.28, blue: 0.05),
+                    Color(red: 0.40, green: 0.18, blue: 0.02)
+                ]
+            }
+            if isBedtime {
+                return [
+                    Color(red: 0.18, green: 0.12, blue: 0.45),
+                    Color(red: 0.12, green: 0.08, blue: 0.32)
+                ]
+            }
+            // Next nap — mor
+            return [
+                Color(red: 0.30, green: 0.20, blue: 0.72),
+                Color(red: 0.22, green: 0.14, blue: 0.58)
+            ]
+        }
+
+        private var accentColor: Color {
+            if isOverdue  { return Color(red: 1.0, green: 0.60, blue: 0.20) }
+            if isBedtime  { return Color(red: 0.72, green: 0.65, blue: 0.98) }
+            return Color(red: 0.80, green: 0.74, blue: 1.0)
+        }
+
+        private var labelText: String {
+            if isOverdue  { return "NAP WINDOW PASSED" }
+            if isBedtime  { return "BEDTIME" }
+            return "NEXT NAP"
+        }
+
+        private var iconName: String {
+            if isOverdue  { return "exclamationmark.triangle.fill" }
+            if isBedtime  { return "moon.stars.fill" }
+            return "moon.fill"
+        }
+
+        private var mainText: String {
+            isOverdue ? "Add nap now" : shortTime(displayTime)
+        }
+
+        private var subText: String {
+            if isOverdue {
+                return "Expected \(shortTime(displayTime)) — may be overtired"
+            }
+            if isBedtime {
+                return "Optimal window to avoid overtiredness"
+            }
+            return "Window: \(recommendationWindow)"
+        }
+
+        // MARK: - Body
+
+        var body: some View {
+            ZStack {
+                // Gradient arka plan
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: gradientColors,
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+
+                // Subtle texture — arka planda büyük ikon
+                Image(systemName: iconName)
+                    .font(.system(size: 90, weight: .thin))
+                    .foregroundStyle(Color.white.opacity(0.04))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
+                    .padding(.trailing, -10)
+                    .clipped()
+
+                // İçerik
+                HStack(alignment: .center, spacing: 16) {
+
+                    // Sol: label + saat + detay
+                    VStack(alignment: .leading, spacing: 8) {
+
+                        // Üst etiket
+                        HStack(spacing: 5) {
+                            if isOverdue {
+                                // Overdue pulse noktası
+                                Circle()
+                                    .fill(accentColor)
+                                    .frame(width: 6, height: 6)
+                            }
+                            Text(labelText)
+                                .font(.system(size: 10, weight: .bold))
                                 .foregroundStyle(accentColor)
+                                .tracking(0.6)
+                        }
+
+                        // Ana saat
+                        Text(mainText)
+                            .font(.system(size: 28, weight: .bold, design: .rounded))
+                            .foregroundStyle(Color.white)
+                            .monospacedDigit()
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+
+                        // Alt detay
+                        Text(subText)
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(accentColor.opacity(0.85))
+                            .lineLimit(2)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+
+                    Spacer()
+
+                    // Sağ: ikon + confidence
+                    VStack(spacing: 6) {
+                        ZStack {
+                            // Dış halka
+                            Circle()
+                                .stroke(Color.white.opacity(0.15), lineWidth: 1.5)
+                                .frame(width: 58, height: 58)
+
+                            // İkon arka planı
+                            Circle()
+                                .fill(Color.white.opacity(0.12))
+                                .frame(width: 54, height: 54)
+
+                            Image(systemName: iconName)
+                                .font(.system(size: 22, weight: .semibold))
+                                .foregroundStyle(Color.white)
+                        }
+
+                        if !isOverdue {
+                            Text("\(confidencePercent)%")
+                                .font(.system(size: 13, weight: .bold, design: .rounded))
+                                .foregroundStyle(Color.white)
+                            Text("conf.")
+                                .font(.system(size: 9, weight: .semibold))
+                                .foregroundStyle(accentColor.opacity(0.7))
+                        } else {
+                            Text("Log now")
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundStyle(accentColor)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 3)
+                                .background(
+                                    Capsule()
+                                        .fill(accentColor.opacity(0.2))
+                                )
                         }
                     }
                 }
-                .padding(16)
-                .contentShape(Rectangle())
-                .background(
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .fill(backgroundTint)
-                )
+                .padding(.horizontal, 18)
+                .padding(.vertical, 18)
             }
-            .buttonStyle(CardPressButtonStyle())
+            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .stroke(accentColor.opacity(0.25), lineWidth: 1)
+            )
+            .shadow(
+                color: gradientColors[1].opacity(0.5),
+                radius: 14, x: 0, y: 7
+            )
+            .animation(.easeInOut(duration: 0.3), value: isBedtime)
+            .animation(.easeInOut(duration: 0.3), value: isOverdue)
         }
 
-        private var typicalWakeDate: Date {
-            let wakeHour   = UserDefaults.standard.object(forKey: "typicalWakeHour")   as? Double ?? 7.0
-            let wakeMinute = UserDefaults.standard.object(forKey: "typicalWakeMinute") as? Double ?? 0.0
-            let today = Calendar.current.startOfDay(for: Date())
-            return Calendar.current.date(
-                bySettingHour: Int(wakeHour), minute: Int(wakeMinute), second: 0, of: today
-            ) ?? Date()
+        private func shortTime(_ date: Date) -> String {
+            let f = DateFormatter()
+            f.locale = Locale(identifier: "en_US_POSIX")
+            f.dateFormat = "h:mm a"
+            return f.string(from: date)
         }
-
+    }
     // MARK: - Night Watch Card
     // Bu kart isStillInNightSleep == true olduğunda gösterilir.
     // stillSleepingCard'ın yerine geçer.
@@ -840,6 +981,15 @@ struct SleepListView: View {
             ongoingNight: todayRecords.first { $0.kind == .nightSleep && $0.isOngoing },
             expectedWakeTime: typicalWakeDate
         )
+    }
+    
+    private var typicalWakeDate: Date {
+        let wakeHour   = UserDefaults.standard.object(forKey: "typicalWakeHour")   as? Double ?? 7.0
+        let wakeMinute = UserDefaults.standard.object(forKey: "typicalWakeMinute") as? Double ?? 0.0
+        let today = Calendar.current.startOfDay(for: Date())
+        return Calendar.current.date(
+            bySettingHour: Int(wakeHour), minute: Int(wakeMinute), second: 0, of: today
+        ) ?? Date()
     }
     // MARK: - NightWatchCard Component
 
