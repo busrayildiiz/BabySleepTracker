@@ -584,7 +584,6 @@ struct SleepListView: View {
                     }
                        todayTimelineCard
                        coachInsightCard
-                       todayWakeUpCard
                        totalSleepCard
                        statsRow
 
@@ -1421,43 +1420,6 @@ struct SleepListView: View {
             RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .stroke(Color.sleepStroke, lineWidth: 1)
         )
-    }
-    // MARK: Today Wakeup Card
-    private var todayWakeUpCard: some View {
-        Button { activeSheet = .wakeTime } label: {
-            HStack {
-                HStack(spacing: 10) {
-                    Image(systemName: "sunrise.fill")
-                        .font(.system(size: 18))
-                        .foregroundStyle(Color.orange)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Today's wake-up")
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(.primary)
-                        Text(todayWakeRecord == nil
-                             ? "Add the time \(babyName) woke up"
-                             : "Used for predictions")
-                            .font(.system(size: 11))
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                Spacer()
-                Text(todayWakeRecord.map { shortTime($0.wakeTime) } ?? "Add time")
-                    .font(.system(size: 15, weight: .semibold, design: .rounded))
-                    .foregroundStyle(todayWakeRecord == nil ? Color.sleepPurpleDeep : .primary)
-            }
-            .padding(16)
-            .contentShape(Rectangle())
-            .background(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .fill(Color(.systemBackground))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .stroke(Color.sleepStroke, lineWidth: 1)
-            )
-        }
-        .buttonStyle(.plain)
     }
     
     // MARK: - Timeline Card
