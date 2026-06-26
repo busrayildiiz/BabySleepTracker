@@ -1380,50 +1380,168 @@ struct SleepListView: View {
                 .fill(Color(.secondarySystemGroupedBackground))
         )
     }
-    //MARK: Coach insight Card
+
+    // MARK: - Coach Insight Card
+
     private var coachInsightCard: some View {
-        HStack(alignment: .top, spacing: 12) {
-            ZStack {
-                Circle().fill(Color.sleepPurple.opacity(0.14)).frame(width: 32, height: 32)
-                Image(systemName: "brain.head.profile")
-                    .font(.system(size: 15))
-                    .foregroundStyle(Color.sleepPurpleDeep)
-            }
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 6) {
-                    Text("Coach Insight")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(.primary)
-                    if orchestrator.isLLMLoading {
-                        ProgressView().scaleEffect(0.5).tint(Color.sleepPurpleDeep)
-                    } else if orchestrator.llmResponse != nil {
-                        Text("AI")
-                            .font(.system(size: 8, weight: .heavy))
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 5).padding(.vertical, 2)
-                            .background(Capsule().fill(Color.sleepPurpleDeep))
-                    }
+        VStack(spacing: 0) {
+
+            HStack(spacing: 10) {
+
+                ZStack {
+                    Circle()
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    Color(red: 0.55, green: 0.45, blue: 0.98),
+                                    Color(red: 0.38, green: 0.28, blue: 0.82)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 38, height: 38)
+                        .shadow(color: Color(red: 0.45, green: 0.35, blue: 0.92).opacity(0.4),
+                                radius: 6, x: 0, y: 3)
+
+                    Image(systemName: "brain.head.profile")
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(.white)
                 }
+
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 6) {
+                        Text("AI Coach")
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundStyle(Color(.label))
+
+                        if orchestrator.isLLMLoading {
+                            // Yükleniyor
+                            HStack(spacing: 4) {
+                                ProgressView()
+                                    .scaleEffect(0.55)
+                                    .tint(Color(red: 0.55, green: 0.45, blue: 0.98))
+                                Text("Analyzing...")
+                                    .font(.system(size: 9, weight: .semibold))
+                                    .foregroundStyle(Color(red: 0.55, green: 0.45, blue: 0.98))
+                            }
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 3)
+                            .background(
+                                Capsule()
+                                    .fill(Color(red: 0.55, green: 0.45, blue: 0.98).opacity(0.10))
+                            )
+                        } else if orchestrator.llmResponse != nil {
+                            // AI yanıtı var
+                            HStack(spacing: 3) {
+                                Image(systemName: "sparkles")
+                                    .font(.system(size: 8, weight: .bold))
+                                Text("AI")
+                                    .font(.system(size: 9, weight: .heavy))
+                            }
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 3)
+                            .background(
+                                Capsule()
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [
+                                                Color(red: 0.55, green: 0.45, blue: 0.98),
+                                                Color(red: 0.38, green: 0.28, blue: 0.82)
+                                            ],
+                                            startPoint: .leading,
+                                            endPoint: .trailing
+                                        )
+                                    )
+                            )
+                        } else {
+                            // Rule engine
+                            Text("Smart tip")
+                                .font(.system(size: 9, weight: .semibold))
+                                .foregroundStyle(Color(red: 0.55, green: 0.45, blue: 0.98))
+                                .padding(.horizontal, 7)
+                                .padding(.vertical, 3)
+                                .background(
+                                    Capsule()
+                                        .fill(Color(red: 0.55, green: 0.45, blue: 0.98).opacity(0.10))
+                                )
+                        }
+                    }
+
+                    Text("Personalized for \(babyName)")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(Color(.secondaryLabel))
+                }
+
+                Spacer()
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 16)
+            .padding(.bottom, 12)
+
+            // ── Seperator ───────────────────────────────────────────
+            Rectangle()
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            Color(red: 0.55, green: 0.45, blue: 0.98).opacity(0.0),
+                            Color(red: 0.55, green: 0.45, blue: 0.98).opacity(0.25),
+                            Color(red: 0.55, green: 0.45, blue: 0.98).opacity(0.0)
+                        ],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+                .frame(height: 1)
+                .padding(.horizontal, 16)
+
+            // ── Message ─────────────────────────────────────────────
+            HStack(alignment: .top, spacing: 10) {
+               
+                Text("❝")
+                    .font(.system(size: 22, weight: .bold))
+                    .foregroundStyle(Color(red: 0.55, green: 0.45, blue: 0.98).opacity(0.25))
+                    .offset(y: -2)
+
                 Text(insightText)
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
-                    .lineSpacing(2)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(Color(.label).opacity(0.82))
+                    .lineSpacing(4)
                     .fixedSize(horizontal: false, vertical: true)
             }
+            .padding(.horizontal, 16)
+            .padding(.top, 12)
+            .padding(.bottom, 16)
         }
-        .padding(16)
         .background(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(Color(.systemBackground))
+            ZStack {
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .fill(Color(.systemBackground))
+
+                // Sol kenar mor aksanı
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color(red: 0.55, green: 0.45, blue: 0.98).opacity(0.08),
+                                Color.clear
+                            ],
+                            startPoint: .leading,
+                            endPoint: .center
+                        )
+                    )
+            }
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .stroke(Color.sleepStroke, lineWidth: 1)
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .stroke(Color(red: 0.55, green: 0.45, blue: 0.98).opacity(0.18), lineWidth: 1)
         )
+        .shadow(color: Color(red: 0.45, green: 0.35, blue: 0.92).opacity(0.08),
+                radius: 12, x: 0, y: 4)
     }
     
     // MARK: - Timeline Card
-
 
         private var todayTimelineCard: some View {
             VStack(alignment: .leading, spacing: 18) {
@@ -1486,6 +1604,7 @@ struct SleepListView: View {
                     .stroke(Color.sleepStroke, lineWidth: 1)
             )
         }
+    
     private func timelineNode(_ item: TimelineItem) -> some View {
         VStack(spacing: 5) {
             ZStack {
