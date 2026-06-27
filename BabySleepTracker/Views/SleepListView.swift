@@ -1543,127 +1543,218 @@ struct SleepListView: View {
     
     // MARK: - Timeline Card
 
-        private var todayTimelineCard: some View {
-            VStack(alignment: .leading, spacing: 18) {
-                HStack {
-                    Text(isStillInNightSleep ? "Plan for Today" : "Today's Timeline")
-                        .font(.system(size: 20, weight: .bold, design: .rounded))
-                        .foregroundStyle(Color.sleepInk)
-                    Spacer()
-                    Button {
-                        activeSheet = .dayDetail(SelectedDay(day: Date()))
-                    } label: {
-                        HStack(spacing: 7) {
-                            Text("View full timeline")
-                                .font(.system(size: 13, weight: .bold))
-                            Image(systemName: "chevron.right")
-                                .font(.system(size: 13, weight: .bold))
-                        }
-                        .foregroundStyle(Color.sleepPurpleDeep)
+    private var todayTimelineCard: some View {
+        VStack(alignment: .leading, spacing: 16) {
+
+            // ── Başlık ──────────────────────────────────────────
+            HStack {
+                Text(isStillInNightSleep ? "Plan for Today" : "Today's Timeline")
+                    .font(.system(size: 20, weight: .bold, design: .rounded))
+                    .foregroundStyle(Color(.label))
+                Spacer()
+                Button {
+                    activeSheet = .dayDetail(SelectedDay(day: Date()))
+                } label: {
+                    HStack(spacing: 5) {
+                        Text("View full timeline")
+                            .font(.system(size: 13, weight: .bold))
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 12, weight: .bold))
                     }
-                    .buttonStyle(.plain)
+                    .foregroundStyle(Color(red: 0.45, green: 0.35, blue: 0.92))
                 }
+                .buttonStyle(.plain)
+            }
 
-                if isStillInNightSleep {
-                    HStack(spacing: 7) {
-                        Image(systemName: "sparkles")
-                            .foregroundStyle(Color.sleepPurpleDeep)
-                        Text("The plan adjusts as the day goes on. Predictions refresh after every new record.")
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(Color.sleepMuted)
-                    }
-                    .padding(10)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .fill(Color.sleepPurple.opacity(0.06))
-                    )
+            // ── Info banner ──────────────────────────────────────
+            if isStillInNightSleep {
+                HStack(spacing: 7) {
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(Color(red: 0.55, green: 0.45, blue: 0.98))
+                    Text("The plan adjusts as the day goes on. Predictions refresh after every new record.")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(Color(.secondaryLabel))
                 }
+                .padding(10)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(Color(red: 0.55, green: 0.45, blue: 0.98).opacity(0.07))
+                )
+            }
 
-                HStack(alignment: .top, spacing: 0) {
-                    ForEach(Array(timelineItems.enumerated()), id: \.element.id) { index, item in
-                        timelineNode(item)
+            // ── Timeline nodes ───────────────────────────────────
+            HStack(alignment: .top, spacing: 0) {
+                ForEach(Array(timelineItems.enumerated()), id: \.element.id) { index, item in
+                    premiumTimelineNode(item)
 
-                        if index < timelineItems.count - 1 {
-                            timelineSegment(
-                                awakeMinutes: timelineItems[index + 1].awakeBeforeMinutes,
-                                isDashed: timelineItems[index + 1].isFuture
-                            )
-                        }
+                    if index < timelineItems.count - 1 {
+                        premiumTimelineSegment(
+                            awakeMinutes: timelineItems[index + 1].awakeBeforeMinutes,
+                            isDashed:     timelineItems[index + 1].isFuture,
+                            fromColor:    item.iconColor,
+                            toColor:      timelineItems[index + 1].iconColor
+                        )
                     }
                 }
             }
-            .padding(18)
-            .background(
+            .padding(.top, 4)
+        }
+        .padding(18)
+        .background(
+            ZStack {
                 RoundedRectangle(cornerRadius: 22, style: .continuous)
                     .fill(Color(.systemBackground))
-                    .shadow(color: Color.sleepInk.opacity(0.05), radius: 16, x: 0, y: 8)
-            )
-            .overlay(
                 RoundedRectangle(cornerRadius: 22, style: .continuous)
-                    .stroke(Color.sleepStroke, lineWidth: 1)
-            )
-        }
-    
-    private func timelineNode(_ item: TimelineItem) -> some View {
-        VStack(spacing: 5) {
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color(red: 0.55, green: 0.45, blue: 0.98).opacity(0.05),
+                                Color.clear
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .center
+                        )
+                    )
+            }
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .stroke(Color(red: 0.55, green: 0.45, blue: 0.98).opacity(0.12), lineWidth: 1)
+        )
+        .shadow(color: Color(red: 0.45, green: 0.35, blue: 0.92).opacity(0.08),
+                radius: 16, x: 0, y: 6)
+    }
+
+    // MARK: - Premium Timeline Node
+
+    private func premiumTimelineNode(_ item: TimelineItem) -> some View {
+        VStack(spacing: 6) {
             ZStack {
+                if !item.isFuture && !item.isOverdue {
+                    Circle()
+                        .fill(item.iconColor.opacity(0.15))
+                        .frame(width: 44, height: 44)
+                        .blur(radius: 6)
+                }
+
                 Circle()
-                    .fill(item.isOverdue
-                          ? Color.orange.opacity(0.15)
-                          : item.iconColor.opacity(item.isFuture ? 0.06 : 0.12))
+                    .fill(
+                        item.isOverdue
+                            ? Color.orange.opacity(0.15)
+                            : item.isFuture
+                                ? item.iconColor.opacity(0.06)
+                                : item.iconColor.opacity(0.14)
+                    )
                     .frame(width: 34, height: 34)
+
                 if item.isFuture && !item.isOverdue {
                     Circle()
-                        .strokeBorder(item.iconColor.opacity(0.5), style: StrokeStyle(lineWidth: 1.5, dash: [3, 3]))
+                        .strokeBorder(
+                            item.iconColor.opacity(0.35),
+                            style: StrokeStyle(lineWidth: 1.5, dash: [3, 3])
+                        )
                         .frame(width: 34, height: 34)
-                }
-                if item.isOverdue {
+                } else if item.isOverdue {
                     Circle()
                         .strokeBorder(Color.orange.opacity(0.6), lineWidth: 1.5)
                         .frame(width: 34, height: 34)
+                } else {
+                    Circle()
+                        .strokeBorder(item.iconColor.opacity(0.3), lineWidth: 1)
+                        .frame(width: 34, height: 34)
                 }
+
                 Image(systemName: item.icon)
                     .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(item.isOverdue ? .orange : item.iconColor)
+                    .foregroundStyle(
+                        item.isOverdue
+                            ? Color.orange
+                            : item.isFuture
+                                ? item.iconColor.opacity(0.5)
+                                : item.iconColor
+                    )
             }
-            VStack(spacing: 1) {
-                Text(item.time).font(.system(size: 9)).foregroundStyle(.secondary)
+
+            VStack(spacing: 2) {
+                Text(item.time)
+                    .font(.system(size: 9, weight: .medium))
+                    .foregroundStyle(Color(.tertiaryLabel))
+                    .monospacedDigit()
+
                 Text(item.title)
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(item.isOverdue ? .orange : .primary)
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(
+                        item.isOverdue
+                            ? Color.orange
+                            : item.isFuture
+                                ? Color(.secondaryLabel)
+                                : Color(.label)
+                    )
+                    .multilineTextAlignment(.center)
+
                 if !item.detail.isEmpty {
                     Text(item.detail)
                         .font(.system(size: 9, weight: .semibold))
-                        .foregroundStyle(item.isOverdue ? .orange : item.iconColor)
+                        .foregroundStyle(
+                            item.isOverdue
+                                ? Color.orange.opacity(0.8)
+                                : item.isFuture
+                                    ? item.iconColor.opacity(0.5)
+                                    : item.iconColor
+                        )
+                        .multilineTextAlignment(.center)
                 }
             }
         }
         .frame(width: 58)
     }
-    private func timelineSegment(awakeMinutes: Int, isDashed: Bool) -> some View {
-        VStack(spacing: 2) {
+
+    // MARK: - Premium Timeline Segment
+
+    private func premiumTimelineSegment(
+        awakeMinutes: Int,
+        isDashed:     Bool,
+        fromColor:    Color,
+        toColor:      Color
+    ) -> some View {
+        VStack(spacing: 3) {
             if isDashed {
                 Rectangle()
                     .fill(Color.clear)
                     .frame(height: 1.5)
                     .overlay(
                         Rectangle()
-                            .strokeBorder(Color.sleepStroke.opacity(0.8), style: StrokeStyle(lineWidth: 1.5, dash: [4, 3]))
+                            .strokeBorder(
+                                Color(red: 0.55, green: 0.45, blue: 0.98).opacity(0.25),
+                                style: StrokeStyle(lineWidth: 1.5, dash: [4, 3])
+                            )
                     )
             } else {
                 Rectangle()
-                    .fill(Color.sleepStroke)
+                    .fill(
+                        LinearGradient(
+                            colors: [fromColor.opacity(0.4), toColor.opacity(0.4)],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
                     .frame(height: 1.5)
             }
-            Text(awakeMinutes > 0 ? TimeFormat.minutes(awakeMinutes) : "")
-                .font(.system(size: 8))
-                .foregroundStyle(Color.sleepMuted)
-                .lineLimit(1)
+
+            if awakeMinutes > 0 {
+                Text(TimeFormat.minutes(awakeMinutes))
+                    .font(.system(size: 8, weight: .semibold))
+                    .foregroundStyle(Color(.tertiaryLabel))
+                    .lineLimit(1)
+            }
         }
         .frame(maxWidth: .infinity)
-        .padding(.top, 17)
+        .padding(.top, 16)
     }
+    
+    
     private func timelineColumn(_ item: TimelineItem) -> some View {
         ZStack(alignment: .top) {
 
