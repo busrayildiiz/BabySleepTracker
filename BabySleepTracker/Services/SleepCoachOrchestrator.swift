@@ -335,18 +335,26 @@ final class SleepCoachOrchestrator: ObservableObject {
                 return name.isEmpty ? "Baby" : name
             }
 
-            private func loadAgeMonths(at date: Date) -> Int {
-                let birthDateKey: Date?
-                if let saved = UserDefaults.standard.object(forKey: "birthDateKey") as? Date {
-                    birthDateKey = saved
-                } else if let seconds = UserDefaults.standard.object(forKey: "birthDateKey") as? Double {
-                    birthDateKey = Date(timeIntervalSince1970: seconds)
-                } else {
-                    birthDateKey = nil
-                }
-                guard let birth = birthDateKey else { return 9 }
-                return max(0, Calendar.current.dateComponents([.month], from: birth, to: date).month ?? 9)
-            }
+    private func loadAgeMonths(at now: Date = Date()) -> Int {
+        let birthDate: Date?
+        
+        // UserDefaults'tan doğum tarihini güvenli bir şekilde çözüyoruz
+        if let saved = UserDefaults.standard.object(forKey: "babyBirthDate") as? Date {
+            birthDate = saved
+        } else if let seconds = UserDefaults.standard.object(forKey: "babyBirthDate") as? Double {
+            birthDate = Date(timeIntervalSince1970: seconds)
+        } else {
+            birthDate = nil
+        }
+        
+        guard let babyBirthDate = birthDate else { return 0 }
+        
+        // Takvim sapmalarını (artık yıl/ay) engelleyen kesin hesaplama
+        let calendar = Calendar.current
+        let components = calendar.dateComponents([.month], from: babyBirthDate, to: now)
+        
+        return components.month ?? 0
+    }
 
             private func countTrackedDays(
                 records:     [SleepRecord],

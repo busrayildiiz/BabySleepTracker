@@ -46,10 +46,10 @@
             filePath = "BabySleepTracker/Views/SleepListView.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "742"
-            endingLineNumber = "742"
-            landmarkName = "SleepListView"
-            landmarkType = "14">
+            startingLineNumber = "745"
+            endingLineNumber = "745"
+            landmarkName = "isStillInNightSleep"
+            landmarkType = "24">
          </BreakpointContent>
       </BreakpointProxy>
    </Breakpoints>

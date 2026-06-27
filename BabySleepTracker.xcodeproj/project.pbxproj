@@ -180,13 +180,6 @@
 			path = Memory;
 			sourceTree = "<group>";
 		};
-		FA91C5F92FDB4C9C0089E1EE /* Guidelines */ = {
-			isa = PBXGroup;
-			children = (
-			);
-			path = Guidelines;
-			sourceTree = "<group>";
-		};
 		FAD9C3752FDC385300A7D9B7 /* Protocols */ = {
 			isa = PBXGroup;
 			children = (
@@ -239,7 +232,6 @@
 				FAB4BB052FE2059000702F49 /* Info.plist */,
 				FAEF10432F4E207F00E76FD4 /* BabySleepTrackerApp.swift */,
 				FA7232E82FDD8F1E00647487 /* Config */,
-				FA91C5F92FDB4C9C0089E1EE /* Guidelines */,
 				FA91C5EE2FDB48350089E1EE /* Memory */,
 				FA91C5EA2FDB476C0089E1EE /* Agents */,
 				FAEF10622F4E26DA00E76FD4 /* Utils */,

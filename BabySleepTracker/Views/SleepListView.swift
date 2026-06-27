@@ -765,15 +765,16 @@ struct SleepListView: View {
             }
         }
 
-    // MARK: - Regular Next Nap / Bedtime Card
 
+    // MARK: - Regular Next Nap / Bedtime Card
+     
     private var regularNextNapOrBedtimeCard: some View {
         let isBedtime = orchestrator.snapshot?.nextSleepKind == .bedtime
         let isOverdue = isNextNapOverdue
         let displayTime = isBedtime
             ? (orchestrator.snapshot?.night.optimalBedtimeStart ?? nextNapTime)
             : nextNapTime
-
+     
         return Button {
             activeSheet = .addSleep(editing: nil, defaultDate: isOverdue ? Date() : displayTime)
         } label: {
@@ -782,170 +783,135 @@ struct SleepListView: View {
                 isOverdue:            isOverdue,
                 displayTime:          displayTime,
                 recommendationWindow: recommendationWindow,
-                confidencePercent:    confidencePercent
+                confidencePercent:    confidencePercent,
+                bedtimeWindowEnd:     orchestrator.snapshot?.night.optimalBedtimeEnd,
+                overtiredRiskTime:    orchestrator.snapshot?.night.overtiredRiskTime
             )
         }
         .buttonStyle(CardPressButtonStyle())
     }
-
+    
     // MARK: - NextSleepCard Component
-
+     
     struct NextSleepCard: View {
         let isBedtime:            Bool
         let isOverdue:            Bool
         let displayTime:          Date
         let recommendationWindow: String
         let confidencePercent:    Int
-
-        // MARK: - State colours
-
-        private var gradientColors: [Color] {
-            if isOverdue {
-                return [
-                    Color(red: 0.55, green: 0.28, blue: 0.05),
-                    Color(red: 0.40, green: 0.18, blue: 0.02)
-                ]
-            }
-            if isBedtime {
-                return [
-                    Color(red: 0.18, green: 0.12, blue: 0.45),
-                    Color(red: 0.12, green: 0.08, blue: 0.32)
-                ]
-            }
-            // Next nap — mor
-            return [
-                Color(red: 0.30, green: 0.20, blue: 0.72),
-                Color(red: 0.22, green: 0.14, blue: 0.58)
-            ]
+        let bedtimeWindowEnd:     Date?
+        let overtiredRiskTime:    Date?
+     
+        // Bedtime saati geldi mi?
+        private var isNightMode: Bool {
+            guard isBedtime else { return false }
+            return Date() >= displayTime
         }
-
-        private var accentColor: Color {
-            if isOverdue  { return Color(red: 1.0, green: 0.60, blue: 0.20) }
-            if isBedtime  { return Color(red: 0.72, green: 0.65, blue: 0.98) }
-            return Color(red: 0.80, green: 0.74, blue: 1.0)
+     
+        // Overtired risk geçti mi?
+        private var isOvertired: Bool {
+            guard let risk = overtiredRiskTime else { return false }
+            return isBedtime && Date() >= risk
         }
-
-        private var labelText: String {
-            if isOverdue  { return "NAP WINDOW PASSED" }
-            if isBedtime  { return "BEDTIME" }
-            return "NEXT NAP"
+     
+        // Bedtime'a kalan dakika
+        private var minutesUntilBedtime: Int {
+            guard isBedtime, !isNightMode else { return 0 }
+            return max(0, Int(displayTime.timeIntervalSince(Date()) / 60))
         }
-
-        private var iconName: String {
-            if isOverdue  { return "exclamationmark.triangle.fill" }
-            if isBedtime  { return "moon.stars.fill" }
-            return "moon.fill"
-        }
-
-        private var mainText: String {
-            isOverdue ? "Add nap now" : shortTime(displayTime)
-        }
-
-        private var subText: String {
-            if isOverdue {
-                return "Expected \(shortTime(displayTime)) — may be overtired"
-            }
-            if isBedtime {
-                return "Optimal window to avoid overtiredness"
-            }
-            return "Window: \(recommendationWindow)"
-        }
-
-        // MARK: - Body
-
+     
         var body: some View {
+            if isOvertired {
+                overtiredCard
+            } else if isNightMode {
+                darkModeCard
+            } else if isBedtime {
+                lightBedtimeCard
+            } else {
+                napCard
+            }
+        }
+     
+        // MARK: - 1. Nap Card (light, mor accent)
+     
+        private var napCard: some View {
             ZStack {
-                // Gradient arka plan
                 RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .fill(
-                        LinearGradient(
-                            colors: gradientColors,
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-
-                // Subtle texture — arka planda büyük ikon
-                Image(systemName: iconName)
+                    .fill(Color(.systemBackground))
+     
+                Image(systemName: isOverdue ? "exclamationmark.triangle.fill" : "moon.fill")
                     .font(.system(size: 90, weight: .thin))
-                    .foregroundStyle(Color.white.opacity(0.04))
+                    .foregroundStyle(
+                        (isOverdue ? Color.orange : Color(red: 0.55, green: 0.45, blue: 0.98))
+                        .opacity(0.04)
+                    )
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
                     .padding(.trailing, -10)
                     .clipped()
-
-                // İçerik
+     
                 HStack(alignment: .center, spacing: 16) {
-
-                    // Sol: label + saat + detay
                     VStack(alignment: .leading, spacing: 8) {
-
-                        // Üst etiket
                         HStack(spacing: 5) {
                             if isOverdue {
-                                // Overdue pulse noktası
                                 Circle()
-                                    .fill(accentColor)
+                                    .fill(Color.orange)
                                     .frame(width: 6, height: 6)
                             }
-                            Text(labelText)
+                            Text(isOverdue ? "NAP WINDOW PASSED" : "NEXT NAP")
                                 .font(.system(size: 10, weight: .bold))
-                                .foregroundStyle(accentColor)
+                                .foregroundStyle(isOverdue ? Color.orange : Color(red: 0.45, green: 0.35, blue: 0.92))
                                 .tracking(0.6)
                         }
-
-                        // Ana saat
-                        Text(mainText)
+     
+                        Text(isOverdue ? "Add nap now" : shortTime(displayTime))
                             .font(.system(size: 28, weight: .bold, design: .rounded))
-                            .foregroundStyle(Color.white)
+                            .foregroundStyle(Color(.label))
                             .monospacedDigit()
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.8)
-
-                        // Alt detay
-                        Text(subText)
+     
+                        Text(isOverdue
+                             ? "Expected \(shortTime(displayTime)) — may be overtired"
+                             : "Window: \(recommendationWindow)")
                             .font(.system(size: 12, weight: .medium))
-                            .foregroundStyle(accentColor.opacity(0.85))
-                            .lineLimit(2)
-                            .fixedSize(horizontal: false, vertical: true)
+                            .foregroundStyle(isOverdue
+                                ? Color.orange.opacity(0.85)
+                                : Color(red: 0.45, green: 0.35, blue: 0.92).opacity(0.7))
                     }
-
+     
                     Spacer()
-
-                    // Sağ: ikon + confidence
+     
                     VStack(spacing: 6) {
                         ZStack {
-                            // Dış halka
                             Circle()
-                                .stroke(Color.white.opacity(0.15), lineWidth: 1.5)
+                                .stroke(
+                                    (isOverdue ? Color.orange : Color(red: 0.55, green: 0.45, blue: 0.98))
+                                    .opacity(0.15),
+                                    lineWidth: 1.5
+                                )
                                 .frame(width: 58, height: 58)
-
-                            // İkon arka planı
                             Circle()
-                                .fill(Color.white.opacity(0.12))
+                                .fill(
+                                    (isOverdue ? Color.orange : Color(red: 0.55, green: 0.45, blue: 0.98))
+                                    .opacity(0.10)
+                                )
                                 .frame(width: 54, height: 54)
-
-                            Image(systemName: iconName)
+                            Image(systemName: isOverdue ? "exclamationmark.triangle.fill" : "moon.fill")
                                 .font(.system(size: 22, weight: .semibold))
-                                .foregroundStyle(Color.white)
+                                .foregroundStyle(isOverdue ? Color.orange : Color(red: 0.55, green: 0.45, blue: 0.98))
                         }
-
-                        if !isOverdue {
-                            Text("\(confidencePercent)%")
-                                .font(.system(size: 13, weight: .bold, design: .rounded))
-                                .foregroundStyle(Color.white)
-                            Text("conf.")
-                                .font(.system(size: 9, weight: .semibold))
-                                .foregroundStyle(accentColor.opacity(0.7))
-                        } else {
+     
+                        if isOverdue {
                             Text("Log now")
                                 .font(.system(size: 10, weight: .bold))
-                                .foregroundStyle(accentColor)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 3)
-                                .background(
-                                    Capsule()
-                                        .fill(accentColor.opacity(0.2))
-                                )
+                                .foregroundStyle(Color.orange)
+                                .padding(.horizontal, 8).padding(.vertical, 3)
+                                .background(Capsule().fill(Color.orange.opacity(0.12)))
+                        } else {
+                            Text("\(confidencePercent)%")
+                                .font(.system(size: 13, weight: .bold, design: .rounded))
+                                .foregroundStyle(Color(red: 0.45, green: 0.35, blue: 0.92))
+                            Text("conf.")
+                                .font(.system(size: 9, weight: .semibold))
+                                .foregroundStyle(Color(red: 0.55, green: 0.45, blue: 0.98).opacity(0.6))
                         }
                     }
                 }
@@ -955,16 +921,386 @@ struct SleepListView: View {
             .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .stroke(accentColor.opacity(0.25), lineWidth: 1)
+                    .stroke(
+                        (isOverdue ? Color.orange : Color(red: 0.55, green: 0.45, blue: 0.98))
+                        .opacity(0.15),
+                        lineWidth: 1
+                    )
             )
-            .shadow(
-                color: gradientColors[1].opacity(0.5),
-                radius: 14, x: 0, y: 7
-            )
-            .animation(.easeInOut(duration: 0.3), value: isBedtime)
-            .animation(.easeInOut(duration: 0.3), value: isOverdue)
+            .shadow(color: Color(.label).opacity(0.06), radius: 14, x: 0, y: 6)
         }
-
+     
+        // MARK: - 2. Light Bedtime Card (bedtime yaklaşıyor, henüz gelmedi)
+     
+        private var lightBedtimeCard: some View {
+            ZStack {
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .fill(Color(.systemBackground))
+     
+                // Sağda ay texture
+                Image(systemName: "moon.stars.fill")
+                    .font(.system(size: 90, weight: .thin))
+                    .foregroundStyle(Color(red: 0.35, green: 0.25, blue: 0.80).opacity(0.04))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
+                    .padding(.trailing, -10)
+                    .clipped()
+     
+                VStack(spacing: 0) {
+                    // Üst: başlık + saat + countdown
+                    HStack(alignment: .center, spacing: 16) {
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack(spacing: 5) {
+                                Image(systemName: "moon.stars.fill")
+                                    .font(.system(size: 10, weight: .bold))
+                                    .foregroundStyle(Color(red: 0.35, green: 0.25, blue: 0.80))
+                                Text("BEDTIME")
+                                    .font(.system(size: 10, weight: .bold))
+                                    .foregroundStyle(Color(red: 0.35, green: 0.25, blue: 0.80))
+                                    .tracking(0.6)
+                            }
+     
+                            Text(shortTime(displayTime))
+                                .font(.system(size: 28, weight: .bold, design: .rounded))
+                                .foregroundStyle(Color(.label))
+                                .monospacedDigit()
+     
+                            // Countdown
+                            if minutesUntilBedtime > 0 {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "timer")
+                                        .font(.system(size: 10))
+                                        .foregroundStyle(Color(red: 0.45, green: 0.35, blue: 0.92))
+                                    Text(countdownText)
+                                        .font(.system(size: 12, weight: .semibold))
+                                        .foregroundStyle(Color(red: 0.45, green: 0.35, blue: 0.92))
+                                }
+                            }
+                        }
+     
+                        Spacer()
+     
+                        // Sağ ikon
+                        VStack(spacing: 6) {
+                            ZStack {
+                                Circle()
+                                    .stroke(Color(red: 0.35, green: 0.25, blue: 0.80).opacity(0.15), lineWidth: 1.5)
+                                    .frame(width: 58, height: 58)
+                                Circle()
+                                    .fill(Color(red: 0.35, green: 0.25, blue: 0.80).opacity(0.08))
+                                    .frame(width: 54, height: 54)
+                                Image(systemName: "moon.stars.fill")
+                                    .font(.system(size: 22, weight: .semibold))
+                                    .foregroundStyle(Color(red: 0.35, green: 0.25, blue: 0.80))
+                            }
+                            Text("\(confidencePercent)%")
+                                .font(.system(size: 13, weight: .bold, design: .rounded))
+                                .foregroundStyle(Color(red: 0.35, green: 0.25, blue: 0.80))
+                            Text("conf.")
+                                .font(.system(size: 9, weight: .semibold))
+                                .foregroundStyle(Color(red: 0.35, green: 0.25, blue: 0.80).opacity(0.6))
+                        }
+                    }
+                    .padding(.horizontal, 18)
+                    .padding(.top, 18)
+                    .padding(.bottom, 12)
+     
+                    // Alt: window bilgisi
+                    bedtimeWindowRow
+                        .padding(.horizontal, 18)
+                        .padding(.bottom, 16)
+                }
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .stroke(Color(red: 0.35, green: 0.25, blue: 0.80).opacity(0.15), lineWidth: 1)
+            )
+            .shadow(color: Color(.label).opacity(0.06), radius: 14, x: 0, y: 6)
+        }
+     
+        // MARK: - 3. Dark Mode Card (bedtime saati geldi)
+     
+        private var darkModeCard: some View {
+            ZStack {
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color(red: 0.12, green: 0.08, blue: 0.35),
+                                Color(red: 0.08, green: 0.05, blue: 0.25)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+     
+                Image(systemName: "moon.stars.fill")
+                    .font(.system(size: 90, weight: .thin))
+                    .foregroundStyle(Color.white.opacity(0.04))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
+                    .padding(.trailing, -10)
+                    .clipped()
+     
+                VStack(spacing: 0) {
+                    HStack(alignment: .center, spacing: 16) {
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack(spacing: 5) {
+                                Circle()
+                                    .fill(Color(red: 0.72, green: 0.65, blue: 0.98))
+                                    .frame(width: 6, height: 6)
+                                Text("BEDTIME")
+                                    .font(.system(size: 10, weight: .bold))
+                                    .foregroundStyle(Color(red: 0.72, green: 0.65, blue: 0.98))
+                                    .tracking(0.6)
+                            }
+     
+                            Text(shortTime(displayTime))
+                                .font(.system(size: 28, weight: .bold, design: .rounded))
+                                .foregroundStyle(Color.white)
+                                .monospacedDigit()
+     
+                            Text("Time to sleep · Sweet dreams 🌙")
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundStyle(Color(red: 0.72, green: 0.65, blue: 0.98).opacity(0.85))
+                        }
+     
+                        Spacer()
+     
+                        VStack(spacing: 6) {
+                            ZStack {
+                                Circle()
+                                    .stroke(Color.white.opacity(0.15), lineWidth: 1.5)
+                                    .frame(width: 58, height: 58)
+                                Circle()
+                                    .fill(Color.white.opacity(0.10))
+                                    .frame(width: 54, height: 54)
+                                Image(systemName: "moon.stars.fill")
+                                    .font(.system(size: 22, weight: .semibold))
+                                    .foregroundStyle(Color.white)
+                            }
+                            Text("\(confidencePercent)%")
+                                .font(.system(size: 13, weight: .bold, design: .rounded))
+                                .foregroundStyle(Color.white)
+                            Text("conf.")
+                                .font(.system(size: 9, weight: .semibold))
+                                .foregroundStyle(Color(red: 0.72, green: 0.65, blue: 0.98).opacity(0.6))
+                        }
+                    }
+                    .padding(.horizontal, 18)
+                    .padding(.top, 18)
+                    .padding(.bottom, 12)
+     
+                    // Window bilgisi dark modda
+                    darkBedtimeWindowRow
+                        .padding(.horizontal, 18)
+                        .padding(.bottom, 16)
+                }
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .stroke(Color(red: 0.45, green: 0.35, blue: 0.88).opacity(0.3), lineWidth: 1)
+            )
+            .shadow(color: Color(red: 0.08, green: 0.05, blue: 0.25).opacity(0.5), radius: 14, x: 0, y: 7)
+        }
+     
+        // MARK: - 4. Overtired Card (risk saati geçti)
+     
+        private var overtiredCard: some View {
+            ZStack {
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color(red: 0.55, green: 0.08, blue: 0.08),
+                                Color(red: 0.38, green: 0.05, blue: 0.05)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+     
+                HStack(alignment: .center, spacing: 16) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack(spacing: 5) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .font(.system(size: 10))
+                                .foregroundStyle(Color(red: 1.0, green: 0.75, blue: 0.3))
+                            Text("OVERTIRED RISK")
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundStyle(Color(red: 1.0, green: 0.75, blue: 0.3))
+                                .tracking(0.6)
+                        }
+     
+                        Text("Sleep now!")
+                            .font(.system(size: 28, weight: .bold, design: .rounded))
+                            .foregroundStyle(Color.white)
+     
+                        Text("Past optimal window — put baby to sleep immediately")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(Color(red: 1.0, green: 0.75, blue: 0.3).opacity(0.85))
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+     
+                    Spacer()
+     
+                    VStack(spacing: 6) {
+                        ZStack {
+                            Circle()
+                                .stroke(Color.white.opacity(0.2), lineWidth: 1.5)
+                                .frame(width: 58, height: 58)
+                            Circle()
+                                .fill(Color.white.opacity(0.12))
+                                .frame(width: 54, height: 54)
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .font(.system(size: 22, weight: .semibold))
+                                .foregroundStyle(Color(red: 1.0, green: 0.75, blue: 0.3))
+                        }
+                        Text("Log now")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundStyle(Color(red: 1.0, green: 0.75, blue: 0.3))
+                            .padding(.horizontal, 8).padding(.vertical, 3)
+                            .background(Capsule().fill(Color.white.opacity(0.12)))
+                    }
+                }
+                .padding(.horizontal, 18)
+                .padding(.vertical, 18)
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .stroke(Color(red: 1.0, green: 0.4, blue: 0.2).opacity(0.4), lineWidth: 1)
+            )
+            .shadow(color: Color(red: 0.5, green: 0.05, blue: 0.05).opacity(0.4), radius: 14, x: 0, y: 7)
+        }
+     
+        // MARK: - Bedtime Window Row (light)
+     
+        private var bedtimeWindowRow: some View {
+            HStack(spacing: 0) {
+                // Earliest
+                VStack(spacing: 3) {
+                    Text("EARLIEST")
+                        .font(.system(size: 8, weight: .bold))
+                        .foregroundStyle(Color(.tertiaryLabel))
+                        .tracking(0.4)
+                    Text(shortTime(displayTime))
+                        .font(.system(size: 13, weight: .bold, design: .rounded))
+                        .foregroundStyle(Color(red: 0.25, green: 0.65, blue: 0.45))
+                        .monospacedDigit()
+                }
+                .frame(maxWidth: .infinity)
+     
+                dividerLine
+     
+                // Latest
+                VStack(spacing: 3) {
+                    Text("LATEST")
+                        .font(.system(size: 8, weight: .bold))
+                        .foregroundStyle(Color(.tertiaryLabel))
+                        .tracking(0.4)
+                    Text(bedtimeWindowEnd.map { shortTime($0) } ?? "–")
+                        .font(.system(size: 13, weight: .bold, design: .rounded))
+                        .foregroundStyle(Color(red: 0.35, green: 0.25, blue: 0.80))
+                        .monospacedDigit()
+                }
+                .frame(maxWidth: .infinity)
+     
+                dividerLine
+     
+                // Overtired risk
+                VStack(spacing: 3) {
+                    Text("OVERTIRED")
+                        .font(.system(size: 8, weight: .bold))
+                        .foregroundStyle(Color(.tertiaryLabel))
+                        .tracking(0.4)
+                    Text(overtiredRiskTime.map { shortTime($0) } ?? "–")
+                        .font(.system(size: 13, weight: .bold, design: .rounded))
+                        .foregroundStyle(Color.orange)
+                        .monospacedDigit()
+                }
+                .frame(maxWidth: .infinity)
+            }
+            .padding(.vertical, 10)
+            .background(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(Color(red: 0.35, green: 0.25, blue: 0.80).opacity(0.06))
+            )
+        }
+     
+        // MARK: - Bedtime Window Row (dark)
+     
+        private var darkBedtimeWindowRow: some View {
+            HStack(spacing: 0) {
+                VStack(spacing: 3) {
+                    Text("EARLIEST")
+                        .font(.system(size: 8, weight: .bold))
+                        .foregroundStyle(Color.white.opacity(0.4))
+                        .tracking(0.4)
+                    Text(shortTime(displayTime))
+                        .font(.system(size: 13, weight: .bold, design: .rounded))
+                        .foregroundStyle(Color(red: 0.4, green: 0.85, blue: 0.6))
+                        .monospacedDigit()
+                }
+                .frame(maxWidth: .infinity)
+     
+                Rectangle()
+                    .fill(Color.white.opacity(0.12))
+                    .frame(width: 1, height: 32)
+     
+                VStack(spacing: 3) {
+                    Text("LATEST")
+                        .font(.system(size: 8, weight: .bold))
+                        .foregroundStyle(Color.white.opacity(0.4))
+                        .tracking(0.4)
+                    Text(bedtimeWindowEnd.map { shortTime($0) } ?? "–")
+                        .font(.system(size: 13, weight: .bold, design: .rounded))
+                        .foregroundStyle(Color(red: 0.72, green: 0.65, blue: 0.98))
+                        .monospacedDigit()
+                }
+                .frame(maxWidth: .infinity)
+     
+                Rectangle()
+                    .fill(Color.white.opacity(0.12))
+                    .frame(width: 1, height: 32)
+     
+                VStack(spacing: 3) {
+                    Text("OVERTIRED")
+                        .font(.system(size: 8, weight: .bold))
+                        .foregroundStyle(Color.white.opacity(0.4))
+                        .tracking(0.4)
+                    Text(overtiredRiskTime.map { shortTime($0) } ?? "–")
+                        .font(.system(size: 13, weight: .bold, design: .rounded))
+                        .foregroundStyle(Color(red: 1.0, green: 0.65, blue: 0.3))
+                        .monospacedDigit()
+                }
+                .frame(maxWidth: .infinity)
+            }
+            .padding(.vertical, 10)
+            .background(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(Color.white.opacity(0.07))
+            )
+        }
+     
+        // MARK: - Helpers
+     
+        private var dividerLine: some View {
+            Rectangle()
+                .fill(Color(red: 0.35, green: 0.25, blue: 0.80).opacity(0.15))
+                .frame(width: 1, height: 32)
+        }
+     
+        private var countdownText: String {
+            let mins = minutesUntilBedtime
+            if mins >= 60 {
+                let h = mins / 60
+                let m = mins % 60
+                return m == 0 ? "\(h)h until bedtime" : "\(h)h \(m)m until bedtime"
+            }
+            return "\(mins)m until bedtime"
+        }
+     
         private func shortTime(_ date: Date) -> String {
             let f = DateFormatter()
             f.locale = Locale(identifier: "en_US_POSIX")
@@ -972,6 +1308,7 @@ struct SleepListView: View {
             return f.string(from: date)
         }
     }
+
     // MARK: - Night Watch Card
     // Bu kart isStillInNightSleep == true olduğunda gösterilir.
     // stillSleepingCard'ın yerine geçer.
