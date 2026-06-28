@@ -85,6 +85,12 @@ struct SleepListView: View {
         }
         saveRecords()
     }
+    
+    // MARK: Wakeup Card
+        private var shouldShowWakeUpCard: Bool {
+            let hour = Calendar.current.component(.hour, from: Date())
+            return hour >= 5
+   }
 
     private func saveRecords() {
         if let encoded = try? JSONEncoder().encode(records) {
@@ -125,6 +131,27 @@ struct SleepListView: View {
             UserDefaults.standard.set(encoded, forKey: "dailyWakeRecords_v1")
             NotificationCenter.default.post(name: .dailyWakeRecordsDidChange, object: nil)
         }
+        
+        if let ongoing = records.first(where: { $0.kind == .nightSleep && $0.isOngoing }) {
+                let wakeComponents = Calendar.current.dateComponents([.hour, .minute], from: selectedTime)
+                let today = Calendar.current.startOfDay(for: Date())
+                guard let wakeTime = Calendar.current.date(
+                    bySettingHour: wakeComponents.hour ?? 7,
+                    minute: wakeComponents.minute ?? 0,
+                    second: 0, of: today
+                ) else { return }
+                
+                let duration = max(0, Int(wakeTime.timeIntervalSince(ongoing.date) / 60))
+                let closed = SleepRecord(
+                    id: ongoing.id,
+                    date: ongoing.date,
+                    duration: min(duration, 12 * 60),
+                    kind: ongoing.kind,
+                    parentNapID: ongoing.parentNapID,
+                    isOngoing: false
+                )
+                upsert(closed)
+            }
     }
 
     // MARK: - Derived Data
@@ -576,13 +603,16 @@ struct SleepListView: View {
                 VStack(spacing: 12) {
                     headerSection
                     nextNapOrBedtimeCard
-                    if usingDefaultWakeTime && !isStillInNightSleep {
-                        defaultWakeTimeWarningBanner
+                    if !isStillInNightSleep || Calendar.current.component(.hour, from: Date()) >= 5 {
+                        todayWakeUpCard
                     }
                     if orchestrator.snapshot?.nextSleepKind == .nap && !isStillInNightSleep {
                         bedtimeWindowCard
                     }
                        todayTimelineCard
+                    if !isStillInNightSleep || shouldShowWakeUpCard {
+                        todayWakeUpCard
+                    }
                        coachInsightCard
                        totalSleepCard
                        statsRow
@@ -740,21 +770,22 @@ struct SleepListView: View {
     
     // Henüz typical wake time gelmediyse ve bugün hiç kayıt yoksa, bebek hâlâ gece uykusunda kabul edilir
     private var isStillInNightSleep: Bool {
-        // Case 1: Ongoing night sleep kaydı var
-        if todayRecords.contains(where: { $0.kind == .nightSleep && $0.isOngoing }) {
+        // Case 1: Herhangi bir ongoing night sleep kaydı var (dünden de olabilir)
+        if records.contains(where: { $0.kind == .nightSleep && $0.isOngoing }) {
             return true
         }
         // Case 2: Hiç kayıt yok ve typicalWakeHour henüz gelmedi
         guard todayWakeRecord == nil, todaySleeps.isEmpty else { return false }
-        let wakeHour   = UserDefaults.standard.object(forKey: "typicalWakeHour")   as? Double ?? 7.0
+        let wakeHour   = UserDefaults.standard.object(forKey: "typicalWakeHour") as? Double ?? 7.0
         let wakeMinute = UserDefaults.standard.object(forKey: "typicalWakeMinute") as? Double ?? 0.0
         let today = Calendar.current.startOfDay(for: Date())
         let typicalWake = Calendar.current.date(
             bySettingHour: Int(wakeHour), minute: Int(wakeMinute), second: 0, of: today
         ) ?? Date()
         return Date() < typicalWake
-    }
-    // MARK: next nap or bedtime?
+        
+        
+    }    // MARK: next nap or bedtime?
 
         @ViewBuilder
         private var nextNapOrBedtimeCard: some View {
@@ -764,6 +795,67 @@ struct SleepListView: View {
                 regularNextNapOrBedtimeCard
             }
         }
+
+    // MARK: - Today Wake Up Card
+
+    @ViewBuilder
+    private var todayWakeUpCard: some View {
+        if todayWakeRecord == nil {
+            Button { activeSheet = .wakeTime } label: {
+                HStack(spacing: 14) {
+                    // İkon
+                    ZStack {
+                        Circle()
+                            .fill(Color.orange.opacity(0.2))
+                            .frame(width: 48, height: 48)
+                        Image(systemName: "sun.max.fill")
+                            .font(.system(size: 22, weight: .semibold))
+                            .foregroundStyle(Color.orange)
+                    }
+
+                    // Metin
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Wake-up time needed")
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundStyle(Color.orange)
+                        Text("Add \(babyName)'s actual wake-up time\nfor more accurate predictions.")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(Color(.secondaryLabel))
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+
+                    Spacer()
+
+                    // Sağ buton
+                    HStack(spacing: 4) {
+                        Text("Add wake time")
+                            .font(.system(size: 12, weight: .semibold))
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 11, weight: .semibold))
+                    }
+                    .foregroundStyle(Color.orange)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .fill(Color(.systemBackground))
+                    )
+                }
+                .padding(16)
+                .contentShape(Rectangle())
+                .background(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(Color.orange.opacity(0.10))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .stroke(Color.orange.opacity(0.2), lineWidth: 1)
+                )
+            }
+            .buttonStyle(CardPressButtonStyle())
+        }
+    }
+
 
 
     // MARK: - Regular Next Nap / Bedtime Card
@@ -819,7 +911,7 @@ struct SleepListView: View {
             guard isBedtime, !isNightMode else { return 0 }
             return max(0, Int(displayTime.timeIntervalSince(Date()) / 60))
         }
-     
+    
         var body: some View {
             if isOvertired {
                 overtiredCard
@@ -1309,12 +1401,14 @@ struct SleepListView: View {
         }
     }
 
-    // MARK: - Night Watch Card
-    // Bu kart isStillInNightSleep == true olduğunda gösterilir.
-    // stillSleepingCard'ın yerine geçer.
+
+    private var ongoingNightSleep: SleepRecord? {
+        records.first { $0.kind == .nightSleep && $0.isOngoing }
+    }
+
     private var stillSleepingCard: some View {
         NightWatchCard(
-            ongoingNight: todayRecords.first { $0.kind == .nightSleep && $0.isOngoing },
+            ongoingNight: ongoingNightSleep,
             expectedWakeTime: typicalWakeDate
         )
     }
@@ -1881,9 +1975,8 @@ struct SleepListView: View {
     // MARK: - Timeline Card
 
     private var todayTimelineCard: some View {
+        
         VStack(alignment: .leading, spacing: 16) {
-
-            // ── Başlık ──────────────────────────────────────────
             HStack {
                 Text(isStillInNightSleep ? "Plan for Today" : "Today's Timeline")
                     .font(.system(size: 20, weight: .bold, design: .rounded))
@@ -1903,8 +1996,8 @@ struct SleepListView: View {
                 .buttonStyle(.plain)
             }
 
-            // ── Info banner ──────────────────────────────────────
             if isStillInNightSleep {
+                // Gece uykusu devam ediyor — sadece plan mesajı göster
                 HStack(spacing: 7) {
                     Image(systemName: "sparkles")
                         .font(.system(size: 11, weight: .semibold))
@@ -1919,24 +2012,23 @@ struct SleepListView: View {
                     RoundedRectangle(cornerRadius: 10, style: .continuous)
                         .fill(Color(red: 0.55, green: 0.45, blue: 0.98).opacity(0.07))
                 )
-            }
-
-            // ── Timeline nodes ───────────────────────────────────
-            HStack(alignment: .top, spacing: 0) {
-                ForEach(Array(timelineItems.enumerated()), id: \.element.id) { index, item in
-                    premiumTimelineNode(item)
-
-                    if index < timelineItems.count - 1 {
-                        premiumTimelineSegment(
-                            awakeMinutes: timelineItems[index + 1].awakeBeforeMinutes,
-                            isDashed:     timelineItems[index + 1].isFuture,
-                            fromColor:    item.iconColor,
-                            toColor:      timelineItems[index + 1].iconColor
-                        )
+            } else {
+                // Normal timeline
+                HStack(alignment: .top, spacing: 0) {
+                    ForEach(Array(timelineItems.enumerated()), id: \.element.id) { index, item in
+                        premiumTimelineNode(item)
+                        if index < timelineItems.count - 1 {
+                            premiumTimelineSegment(
+                                awakeMinutes: timelineItems[index + 1].awakeBeforeMinutes,
+                                isDashed:     timelineItems[index + 1].isFuture,
+                                fromColor:    item.iconColor,
+                                toColor:      timelineItems[index + 1].iconColor
+                            )
+                        }
                     }
                 }
+                .padding(.top, 4)
             }
-            .padding(.top, 4)
         }
         .padding(18)
         .background(
@@ -1963,7 +2055,6 @@ struct SleepListView: View {
         .shadow(color: Color(red: 0.45, green: 0.35, blue: 0.92).opacity(0.08),
                 radius: 16, x: 0, y: 6)
     }
-
     // MARK: - Premium Timeline Node
 
     private func premiumTimelineNode(_ item: TimelineItem) -> some View {

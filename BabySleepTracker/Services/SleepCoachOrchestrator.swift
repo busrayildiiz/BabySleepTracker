@@ -278,25 +278,30 @@ final class SleepCoachOrchestrator: ObservableObject {
 
         return records.map { record in
             guard record.isOngoing else { return record }
-
             let startedToday = calendar.isDate(record.date, inSameDayAs: now)
 
+            // Night sleep özel case: dün gece başlamış, bugün typicalWake'den önce → kapat
+            let startedYesterday: Bool = {
+                guard let yesterday = calendar.date(byAdding: .day, value: -1, to: today) else { return false }
+                return calendar.isDate(record.date, inSameDayAs: yesterday)
+            }()
+
             let shouldClose: Bool
-            if !startedToday {
-                // Farklı bir günde başlamış → kesinlikle kapat
-                shouldClose = true
-            }  else {
-                // Bugün başlamış — sadece yarının typicalWake saatini geç
-                guard let tomorrow = Calendar.current.date(byAdding: .day, value: 1, to: Calendar.current.startOfDay(for: now)) else {
-                    return record
-                }
-                let tomorrowWake = Calendar.current.date(
-                    bySettingHour: Int(wakeHour),
-                    minute: Int(wakeMinute),
-                    second: 0,
-                    of: tomorrow
+            if startedToday {
+                // Bugün başlamış → yarının typicalWake'ini bekle
+                guard let tomorrow = calendar.date(byAdding: .day, value: 1, to: today) else { return record }
+                let tomorrowWake = calendar.date(
+                    bySettingHour: Int(wakeHour), minute: Int(wakeMinute), second: 0, of: tomorrow
                 ) ?? tomorrow
                 shouldClose = now >= tomorrowWake
+
+            } else if startedYesterday && record.kind == .nightSleep {
+                // Dün gece başlamış night sleep → bugünün typicalWake'ini geçtiyse kapat
+                shouldClose = now >= typicalWake
+
+            } else {
+                // 2+ gün önce başlamış → kesinlikle kapat
+                shouldClose = true
             }
 
             guard shouldClose else { return record }
