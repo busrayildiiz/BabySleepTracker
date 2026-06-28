@@ -787,15 +787,66 @@ struct SleepListView: View {
         
     }    // MARK: next nap or bedtime?
 
-        @ViewBuilder
-        private var nextNapOrBedtimeCard: some View {
-            if isStillInNightSleep {
-                stillSleepingCard
-            } else {
-                regularNextNapOrBedtimeCard
-            }
+    @ViewBuilder
+    private var nextNapOrBedtimeCard: some View {
+        if isStillInNightSleep {
+            stillSleepingCard
+        } else {
+            regularNextNapOrBedtimeCard
         }
+    }
+    
+    // MARK: - Live Night Sleep Card Wrapper
 
+    private var stillSleepingCard: some View {
+        // 1. UserDefaults'tan ham kayıtları oku (Orchestrator'daki loader'ın aynısı)
+        let rawRecords: [SleepRecord] = {
+            guard let data = UserDefaults.standard.data(forKey: "sleepRecords"),
+                  let decoded = try? JSONDecoder().decode([SleepRecord].self, from: data)
+            else { return [] }
+            return decoded
+        }()
+        
+        // 2. Bu kayıtlar içinden aktif olan gece uykusunu filtrele
+        let ongoingNight = rawRecords.first(where: { $0.isOngoing && $0.kind == .nightSleep })
+        
+        // Tahmini uyanma saati
+        let expectedWake = orchestrator.snapshot?.daytime.nextNapTime
+            ?? Calendar.current.date(bySettingHour: 7, minute: 0, second: 0, of: Date())
+            ?? Date()
+
+        return NightWatchCard(
+            ongoingNight: ongoingNight,
+            expectedWakeTime: expectedWake
+        )
+    }
+    
+    // MARK: - Regular Next Nap / Bedtime Card
+
+    private var regularNextNapOrBedtimeCard: some View {
+        let isBedtime    = orchestrator.snapshot?.nextSleepKind == .bedtime
+        let isOverdue    = isNextNapOverdue
+        let displayTime  = isBedtime
+            ? (orchestrator.snapshot?.night.optimalBedtimeStart ?? nextNapTime)
+            : nextNapTime
+
+        return Button {
+            // Kart tıklama aksiyonu (sheet veya navigation tetikleyiciniz)
+            activeSheet = .addSleep(editing: nil, defaultDate: isOverdue ? Date() : displayTime)
+        } label: {
+            NextSleepCard(
+                isBedtime:         isBedtime,
+                isOverdue:         isOverdue,
+                displayTime:       displayTime,
+                windowText:        recommendationWindow,
+                confidencePercent: confidencePercent,
+                bedtimeWindowEnd:  orchestrator.snapshot?.night.optimalBedtimeEnd,
+                overtiredRiskTime: orchestrator.snapshot?.night.overtiredRiskTime
+            )
+        }
+        .buttonStyle(.plain)
+    }
+    
     // MARK: - Today Wake Up Card
 
     @ViewBuilder
@@ -856,575 +907,453 @@ struct SleepListView: View {
         }
     }
 
-
-
-    // MARK: - Regular Next Nap / Bedtime Card
-     
-    private var regularNextNapOrBedtimeCard: some View {
-        let isBedtime = orchestrator.snapshot?.nextSleepKind == .bedtime
-        let isOverdue = isNextNapOverdue
-        let displayTime = isBedtime
-            ? (orchestrator.snapshot?.night.optimalBedtimeStart ?? nextNapTime)
-            : nextNapTime
-     
-        return Button {
-            activeSheet = .addSleep(editing: nil, defaultDate: isOverdue ? Date() : displayTime)
-        } label: {
-            NextSleepCard(
-                isBedtime:            isBedtime,
-                isOverdue:            isOverdue,
-                displayTime:          displayTime,
-                recommendationWindow: recommendationWindow,
-                confidencePercent:    confidencePercent,
-                bedtimeWindowEnd:     orchestrator.snapshot?.night.optimalBedtimeEnd,
-                overtiredRiskTime:    orchestrator.snapshot?.night.overtiredRiskTime
-            )
-        }
-        .buttonStyle(CardPressButtonStyle())
-    }
-    
     // MARK: - NextSleepCard Component
-     
+
     struct NextSleepCard: View {
-        let isBedtime:            Bool
-        let isOverdue:            Bool
-        let displayTime:          Date
-        let recommendationWindow: String
-        let confidencePercent:    Int
-        let bedtimeWindowEnd:     Date?
-        let overtiredRiskTime:    Date?
-     
-        // Bedtime saati geldi mi?
+        let isBedtime: Bool
+        let isOverdue: Bool
+        let displayTime: Date
+        let windowText: String
+        let confidencePercent: Int
+        let bedtimeWindowEnd: Date?
+        let overtiredRiskTime: Date?
+
+        @State private var pulse = false
+        @State private var starOpacity1: Double = 0.3
+        @State private var starOpacity2: Double = 0.6
+        @State private var starOpacity3: Double = 0.2
+
+        // MARK: - State Detection
+
         private var isNightMode: Bool {
             guard isBedtime else { return false }
             return Date() >= displayTime
         }
-     
-        // Overtired risk geçti mi?
-        private var isOvertired: Bool {
+
+        private var isOvertiredMode: Bool {
             guard let risk = overtiredRiskTime else { return false }
             return isBedtime && Date() >= risk
         }
-     
-        // Bedtime'a kalan dakika
+
         private var minutesUntilBedtime: Int {
             guard isBedtime, !isNightMode else { return 0 }
             return max(0, Int(displayTime.timeIntervalSince(Date()) / 60))
         }
-    
+
+        // MARK: - Theme Engine
+
+        enum CardThemeKind {
+            case nextNap, overdueNap, bedtimeApproaching, nightMode, overtired
+        }
+        
+        private var currentThemeKind: CardThemeKind {
+            if isOvertiredMode { return .overtired }
+            if isOverdue       { return .overdueNap }
+            if isNightMode     { return .nightMode }
+            if isBedtime       { return .bedtimeApproaching }
+            return .nextNap
+        }
+
+        private var cardTheme: CardTheme {
+            switch currentThemeKind {
+            case .nextNap:            return Self.nextNap
+            case .overdueNap:         return Self.overdueNap
+            case .bedtimeApproaching: return Self.bedtimeApproaching
+            case .nightMode:          return Self.nightMode
+            case .overtired:          return Self.overtired
+            }
+        }
+
+        // MARK: - Body
+
         var body: some View {
-            if isOvertired {
-                overtiredCard
-            } else if isNightMode {
-                darkModeCard
-            } else if isBedtime {
-                lightBedtimeCard
-            } else {
-                napCard
-            }
-        }
-     
-        // MARK: - 1. Nap Card (light, mor accent)
-     
-        private var napCard: some View {
+            let t = cardTheme
             ZStack {
+                // Arka plan
                 RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .fill(Color(.systemBackground))
-     
-                Image(systemName: isOverdue ? "exclamationmark.triangle.fill" : "moon.fill")
-                    .font(.system(size: 90, weight: .thin))
-                    .foregroundStyle(
-                        (isOverdue ? Color.orange : Color(red: 0.55, green: 0.45, blue: 0.98))
-                        .opacity(0.04)
-                    )
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
-                    .padding(.trailing, -10)
-                    .clipped()
-     
-                HStack(alignment: .center, spacing: 16) {
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack(spacing: 5) {
-                            if isOverdue {
-                                Circle()
-                                    .fill(Color.orange)
-                                    .frame(width: 6, height: 6)
-                            }
-                            Text(isOverdue ? "NAP WINDOW PASSED" : "NEXT NAP")
-                                .font(.system(size: 10, weight: .bold))
-                                .foregroundStyle(isOverdue ? Color.orange : Color(red: 0.45, green: 0.35, blue: 0.92))
-                                .tracking(0.6)
-                        }
-     
-                        Text(isOverdue ? "Add nap now" : shortTime(displayTime))
-                            .font(.system(size: 28, weight: .bold, design: .rounded))
-                            .foregroundStyle(Color(.label))
-                            .monospacedDigit()
-     
-                        Text(isOverdue
-                             ? "Expected \(shortTime(displayTime)) — may be overtired"
-                             : "Window: \(recommendationWindow)")
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundStyle(isOverdue
-                                ? Color.orange.opacity(0.85)
-                                : Color(red: 0.45, green: 0.35, blue: 0.92).opacity(0.7))
-                    }
-     
-                    Spacer()
-     
-                    VStack(spacing: 6) {
-                        ZStack {
-                            Circle()
-                                .stroke(
-                                    (isOverdue ? Color.orange : Color(red: 0.55, green: 0.45, blue: 0.98))
-                                    .opacity(0.15),
-                                    lineWidth: 1.5
-                                )
-                                .frame(width: 58, height: 58)
-                            Circle()
-                                .fill(
-                                    (isOverdue ? Color.orange : Color(red: 0.55, green: 0.45, blue: 0.98))
-                                    .opacity(0.10)
-                                )
-                                .frame(width: 54, height: 54)
-                            Image(systemName: isOverdue ? "exclamationmark.triangle.fill" : "moon.fill")
-                                .font(.system(size: 22, weight: .semibold))
-                                .foregroundStyle(isOverdue ? Color.orange : Color(red: 0.55, green: 0.45, blue: 0.98))
-                        }
-     
-                        if isOverdue {
-                            Text("Log now")
-                                .font(.system(size: 10, weight: .bold))
-                                .foregroundStyle(Color.orange)
-                                .padding(.horizontal, 8).padding(.vertical, 3)
-                                .background(Capsule().fill(Color.orange.opacity(0.12)))
-                        } else {
-                            Text("\(confidencePercent)%")
-                                .font(.system(size: 13, weight: .bold, design: .rounded))
-                                .foregroundStyle(Color(red: 0.45, green: 0.35, blue: 0.92))
-                            Text("conf.")
-                                .font(.system(size: 9, weight: .semibold))
-                                .foregroundStyle(Color(red: 0.55, green: 0.45, blue: 0.98).opacity(0.6))
-                        }
-                    }
-                }
-                .padding(.horizontal, 18)
-                .padding(.vertical, 18)
-            }
-            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .stroke(
-                        (isOverdue ? Color.orange : Color(red: 0.55, green: 0.45, blue: 0.98))
-                        .opacity(0.15),
-                        lineWidth: 1
-                    )
-            )
-            .shadow(color: Color(.label).opacity(0.06), radius: 14, x: 0, y: 6)
-        }
-     
-        // MARK: - 2. Light Bedtime Card (bedtime yaklaşıyor, henüz gelmedi)
-     
-        private var lightBedtimeCard: some View {
-            ZStack {
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .fill(Color(.systemBackground))
-     
-                // Sağda ay texture
-                Image(systemName: "moon.stars.fill")
-                    .font(.system(size: 90, weight: .thin))
-                    .foregroundStyle(Color(red: 0.35, green: 0.25, blue: 0.80).opacity(0.04))
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
-                    .padding(.trailing, -10)
-                    .clipped()
-     
+                    .fill(LinearGradient(
+                        colors: [t.gradientTop, t.gradientBot],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ))
+
+                // Yıldız texture (gece state'lerinde)
+                if t.showStars { starsLayer }
+
+                // İçerik
                 VStack(spacing: 0) {
-                    // Üst: başlık + saat + countdown
-                    HStack(alignment: .center, spacing: 16) {
-                        VStack(alignment: .leading, spacing: 8) {
-                            HStack(spacing: 5) {
-                                Image(systemName: "moon.stars.fill")
-                                    .font(.system(size: 10, weight: .bold))
-                                    .foregroundStyle(Color(red: 0.35, green: 0.25, blue: 0.80))
-                                Text("BEDTIME")
-                                    .font(.system(size: 10, weight: .bold))
-                                    .foregroundStyle(Color(red: 0.35, green: 0.25, blue: 0.80))
-                                    .tracking(0.6)
-                            }
-     
-                            Text(shortTime(displayTime))
-                                .font(.system(size: 28, weight: .bold, design: .rounded))
-                                .foregroundStyle(Color(.label))
-                                .monospacedDigit()
-     
-                            // Countdown
-                            if minutesUntilBedtime > 0 {
-                                HStack(spacing: 4) {
-                                    Image(systemName: "timer")
-                                        .font(.system(size: 10))
-                                        .foregroundStyle(Color(red: 0.45, green: 0.35, blue: 0.92))
-                                    Text(countdownText)
-                                        .font(.system(size: 12, weight: .semibold))
-                                        .foregroundStyle(Color(red: 0.45, green: 0.35, blue: 0.92))
-                                }
-                            }
-                        }
-     
-                        Spacer()
-     
-                        // Sağ ikon
-                        VStack(spacing: 6) {
-                            ZStack {
-                                Circle()
-                                    .stroke(Color(red: 0.35, green: 0.25, blue: 0.80).opacity(0.15), lineWidth: 1.5)
-                                    .frame(width: 58, height: 58)
-                                Circle()
-                                    .fill(Color(red: 0.35, green: 0.25, blue: 0.80).opacity(0.08))
-                                    .frame(width: 54, height: 54)
-                                Image(systemName: "moon.stars.fill")
-                                    .font(.system(size: 22, weight: .semibold))
-                                    .foregroundStyle(Color(red: 0.35, green: 0.25, blue: 0.80))
-                            }
-                            Text("\(confidencePercent)%")
-                                .font(.system(size: 13, weight: .bold, design: .rounded))
-                                .foregroundStyle(Color(red: 0.35, green: 0.25, blue: 0.80))
-                            Text("conf.")
-                                .font(.system(size: 9, weight: .semibold))
-                                .foregroundStyle(Color(red: 0.35, green: 0.25, blue: 0.80).opacity(0.6))
-                        }
-                    }
-                    .padding(.horizontal, 18)
-                    .padding(.top, 18)
-                    .padding(.bottom, 12)
-     
-                    // Alt: window bilgisi
-                    bedtimeWindowRow
-                        .padding(.horizontal, 18)
-                        .padding(.bottom, 16)
+                    topRow(t)
+                    Divider()
+                        .background(Color.white.opacity(0.08))
+                        .padding(.horizontal, 16)
+                    bottomRow(t)
                 }
             }
             .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .stroke(Color(red: 0.35, green: 0.25, blue: 0.80).opacity(0.15), lineWidth: 1)
+                    .stroke(t.borderColor, lineWidth: 1)
             )
-            .shadow(color: Color(.label).opacity(0.06), radius: 14, x: 0, y: 6)
-        }
-     
-        // MARK: - 3. Dark Mode Card (bedtime saati geldi)
-     
-        private var darkModeCard: some View {
-            ZStack {
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                Color(red: 0.12, green: 0.08, blue: 0.35),
-                                Color(red: 0.08, green: 0.05, blue: 0.25)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-     
-                Image(systemName: "moon.stars.fill")
-                    .font(.system(size: 90, weight: .thin))
-                    .foregroundStyle(Color.white.opacity(0.04))
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
-                    .padding(.trailing, -10)
-                    .clipped()
-     
-                VStack(spacing: 0) {
-                    HStack(alignment: .center, spacing: 16) {
-                        VStack(alignment: .leading, spacing: 8) {
-                            HStack(spacing: 5) {
-                                Circle()
-                                    .fill(Color(red: 0.72, green: 0.65, blue: 0.98))
-                                    .frame(width: 6, height: 6)
-                                Text("BEDTIME")
-                                    .font(.system(size: 10, weight: .bold))
-                                    .foregroundStyle(Color(red: 0.72, green: 0.65, blue: 0.98))
-                                    .tracking(0.6)
-                            }
-     
-                            Text(shortTime(displayTime))
-                                .font(.system(size: 28, weight: .bold, design: .rounded))
-                                .foregroundStyle(Color.white)
-                                .monospacedDigit()
-     
-                            Text("Time to sleep · Sweet dreams 🌙")
-                                .font(.system(size: 12, weight: .medium))
-                                .foregroundStyle(Color(red: 0.72, green: 0.65, blue: 0.98).opacity(0.85))
-                        }
-     
-                        Spacer()
-     
-                        VStack(spacing: 6) {
-                            ZStack {
-                                Circle()
-                                    .stroke(Color.white.opacity(0.15), lineWidth: 1.5)
-                                    .frame(width: 58, height: 58)
-                                Circle()
-                                    .fill(Color.white.opacity(0.10))
-                                    .frame(width: 54, height: 54)
-                                Image(systemName: "moon.stars.fill")
-                                    .font(.system(size: 22, weight: .semibold))
-                                    .foregroundStyle(Color.white)
-                            }
-                            Text("\(confidencePercent)%")
-                                .font(.system(size: 13, weight: .bold, design: .rounded))
-                                .foregroundStyle(Color.white)
-                            Text("conf.")
-                                .font(.system(size: 9, weight: .semibold))
-                                .foregroundStyle(Color(red: 0.72, green: 0.65, blue: 0.98).opacity(0.6))
-                        }
-                    }
-                    .padding(.horizontal, 18)
-                    .padding(.top, 18)
-                    .padding(.bottom, 12)
-     
-                    // Window bilgisi dark modda
-                    darkBedtimeWindowRow
-                        .padding(.horizontal, 18)
-                        .padding(.bottom, 16)
-                }
+            .shadow(color: t.shadowColor, radius: 16, x: 0, y: 8)
+            .onAppear {
+                pulse = true
+                withAnimation(.easeInOut(duration: 2.1).repeatForever(autoreverses: true)) { starOpacity1 = 0.9 }
+                withAnimation(.easeInOut(duration: 1.6).repeatForever(autoreverses: true).delay(0.4)) { starOpacity2 = 0.2 }
+                withAnimation(.easeInOut(duration: 2.5).repeatForever(autoreverses: true).delay(0.9)) { starOpacity3 = 0.8 }
             }
-            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .stroke(Color(red: 0.45, green: 0.35, blue: 0.88).opacity(0.3), lineWidth: 1)
-            )
-            .shadow(color: Color(red: 0.08, green: 0.05, blue: 0.25).opacity(0.5), radius: 14, x: 0, y: 7)
+            .animation(.easeInOut(duration: 0.4), value: currentThemeKind)
         }
-     
-        // MARK: - 4. Overtired Card (risk saati geçti)
-     
-        private var overtiredCard: some View {
-            ZStack {
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                Color(red: 0.55, green: 0.08, blue: 0.08),
-                                Color(red: 0.38, green: 0.05, blue: 0.05)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-     
-                HStack(alignment: .center, spacing: 16) {
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack(spacing: 5) {
-                            Image(systemName: "exclamationmark.triangle.fill")
-                                .font(.system(size: 10))
-                                .foregroundStyle(Color(red: 1.0, green: 0.75, blue: 0.3))
-                            Text("OVERTIRED RISK")
-                                .font(.system(size: 10, weight: .bold))
-                                .foregroundStyle(Color(red: 1.0, green: 0.75, blue: 0.3))
-                                .tracking(0.6)
-                        }
-     
-                        Text("Sleep now!")
-                            .font(.system(size: 28, weight: .bold, design: .rounded))
-                            .foregroundStyle(Color.white)
-     
-                        Text("Past optimal window — put baby to sleep immediately")
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundStyle(Color(red: 1.0, green: 0.75, blue: 0.3).opacity(0.85))
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-     
-                    Spacer()
-     
-                    VStack(spacing: 6) {
-                        ZStack {
+
+        // MARK: - Rows
+
+        private func topRow(_ t: CardTheme) -> some View {
+            HStack(alignment: .center, spacing: 16) {
+                VStack(alignment: .leading, spacing: 6) {
+                    // Etiket satırı
+                    HStack(spacing: 5) {
+                        if t.showPulseDot {
                             Circle()
-                                .stroke(Color.white.opacity(0.2), lineWidth: 1.5)
-                                .frame(width: 58, height: 58)
-                            Circle()
-                                .fill(Color.white.opacity(0.12))
-                                .frame(width: 54, height: 54)
-                            Image(systemName: "exclamationmark.triangle.fill")
-                                .font(.system(size: 22, weight: .semibold))
-                                .foregroundStyle(Color(red: 1.0, green: 0.75, blue: 0.3))
+                                .fill(t.labelColor)
+                                .frame(width: 6, height: 6)
+                                .scaleEffect(pulse ? 1.4 : 0.8)
+                                .animation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true), value: pulse)
                         }
-                        Text("Log now")
+                        Text(t.labelText)
                             .font(.system(size: 10, weight: .bold))
-                            .foregroundStyle(Color(red: 1.0, green: 0.75, blue: 0.3))
-                            .padding(.horizontal, 8).padding(.vertical, 3)
-                            .background(Capsule().fill(Color.white.opacity(0.12)))
+                            .foregroundStyle(t.labelColor)
+                            .tracking(0.5)
+                    }
+
+                    // Ana başlık
+                    mainTitle(t)
+
+                    // Alt açıklama
+                    subLabel(t)
+                }
+
+                Spacer()
+                circularRight(t)
+            }
+            .padding(.horizontal, 18)
+            .padding(.top, 18)
+            .padding(.bottom, 14)
+        }
+
+        @ViewBuilder
+        private func mainTitle(_ t: CardTheme) -> some View {
+            switch currentThemeKind {
+            case .overdueNap:
+                Text("Add nap now")
+                    .font(.system(size: 22, weight: .bold, design: .rounded))
+                    .foregroundStyle(t.titleColor)
+            case .overtired:
+                Text("Sleep now!")
+                    .font(.system(size: 22, weight: .bold, design: .rounded))
+                    .foregroundStyle(t.titleColor)
+            default:
+                Text(ampm(displayTime))
+                    .font(.system(size: 22, weight: .bold, design: .rounded))
+                    .foregroundStyle(t.titleColor)
+                    .monospacedDigit()
+            }
+        }
+
+        @ViewBuilder
+        private func subLabel(_ t: CardTheme) -> some View {
+            switch currentThemeKind {
+            case .nextNap:
+                Text("Window: \(windowText)")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(t.subtitleColor)
+            case .overdueNap:
+                Text("Expected \(ampm(displayTime)) — may be overtired")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(t.subtitleColor)
+            case .bedtimeApproaching:
+                VStack(alignment: .leading, spacing: 4) {
+                    if minutesUntilBedtime > 0 {
+                        HStack(spacing: 4) {
+                            Image(systemName: "timer")
+                                .font(.system(size: 10))
+                                .foregroundStyle(t.subtitleColor)
+                            Text(countdownText)
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(t.subtitleColor)
+                        }
                     }
                 }
-                .padding(.horizontal, 18)
-                .padding(.vertical, 18)
+            case .nightMode:
+                Text("Time to sleep · Sweet dreams 🌙")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(t.subtitleColor)
+            case .overtired:
+                Text("Past optimal window — put baby to sleep immediately")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(t.subtitleColor)
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .stroke(Color(red: 1.0, green: 0.4, blue: 0.2).opacity(0.4), lineWidth: 1)
-            )
-            .shadow(color: Color(red: 0.5, green: 0.05, blue: 0.05).opacity(0.4), radius: 14, x: 0, y: 7)
         }
-     
-        // MARK: - Bedtime Window Row (light)
-     
-        private var bedtimeWindowRow: some View {
-            HStack(spacing: 0) {
-                // Earliest
-                VStack(spacing: 3) {
-                    Text("EARLIEST")
-                        .font(.system(size: 8, weight: .bold))
-                        .foregroundStyle(Color(.tertiaryLabel))
-                        .tracking(0.4)
-                    Text(shortTime(displayTime))
-                        .font(.system(size: 13, weight: .bold, design: .rounded))
-                        .foregroundStyle(Color(red: 0.25, green: 0.65, blue: 0.45))
+
+        private func circularRight(_ t: CardTheme) -> some View {
+            ZStack {
+                Circle()
+                    .stroke(t.ringTrack, lineWidth: 5)
+                    .frame(width: 72, height: 72)
+
+                Circle()
+                    .trim(from: 0, to: ringProgress)
+                    .stroke(
+                        AngularGradient(colors: t.ringFill, center: .center),
+                        style: StrokeStyle(lineWidth: 5, lineCap: .round)
+                    )
+                    .frame(width: 72, height: 72)
+                    .rotationEffect(.degrees(-90))
+                    .animation(.easeInOut(duration: 1.0), value: ringProgress)
+
+                VStack(spacing: 1) {
+                    Text(ringLabel)
+                        .font(.system(size: 15, weight: .bold, design: .rounded))
+                        .foregroundStyle(t.ringTextColor)
                         .monospacedDigit()
+                    Text(ringSubLabel)
+                        .font(.system(size: 8, weight: .semibold))
+                        .foregroundStyle(t.labelColor.opacity(0.7))
+                        .multilineTextAlignment(.center)
                 }
-                .frame(maxWidth: .infinity)
-     
-                dividerLine
-     
-                // Latest
-                VStack(spacing: 3) {
-                    Text("LATEST")
-                        .font(.system(size: 8, weight: .bold))
-                        .foregroundStyle(Color(.tertiaryLabel))
-                        .tracking(0.4)
-                    Text(bedtimeWindowEnd.map { shortTime($0) } ?? "–")
-                        .font(.system(size: 13, weight: .bold, design: .rounded))
-                        .foregroundStyle(Color(red: 0.35, green: 0.25, blue: 0.80))
-                        .monospacedDigit()
-                }
-                .frame(maxWidth: .infinity)
-     
-                dividerLine
-     
-                // Overtired risk
-                VStack(spacing: 3) {
-                    Text("OVERTIRED")
-                        .font(.system(size: 8, weight: .bold))
-                        .foregroundStyle(Color(.tertiaryLabel))
-                        .tracking(0.4)
-                    Text(overtiredRiskTime.map { shortTime($0) } ?? "–")
-                        .font(.system(size: 13, weight: .bold, design: .rounded))
-                        .foregroundStyle(Color.orange)
-                        .monospacedDigit()
-                }
-                .frame(maxWidth: .infinity)
             }
-            .padding(.vertical, 10)
-            .background(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(Color(red: 0.35, green: 0.25, blue: 0.80).opacity(0.06))
-            )
         }
-     
-        // MARK: - Bedtime Window Row (dark)
-     
-        private var darkBedtimeWindowRow: some View {
-            HStack(spacing: 0) {
-                VStack(spacing: 3) {
-                    Text("EARLIEST")
-                        .font(.system(size: 8, weight: .bold))
-                        .foregroundStyle(Color.white.opacity(0.4))
-                        .tracking(0.4)
-                    Text(shortTime(displayTime))
-                        .font(.system(size: 13, weight: .bold, design: .rounded))
-                        .foregroundStyle(Color(red: 0.4, green: 0.85, blue: 0.6))
-                        .monospacedDigit()
-                }
-                .frame(maxWidth: .infinity)
-     
-                Rectangle()
-                    .fill(Color.white.opacity(0.12))
-                    .frame(width: 1, height: 32)
-     
-                VStack(spacing: 3) {
-                    Text("LATEST")
-                        .font(.system(size: 8, weight: .bold))
-                        .foregroundStyle(Color.white.opacity(0.4))
-                        .tracking(0.4)
-                    Text(bedtimeWindowEnd.map { shortTime($0) } ?? "–")
-                        .font(.system(size: 13, weight: .bold, design: .rounded))
-                        .foregroundStyle(Color(red: 0.72, green: 0.65, blue: 0.98))
-                        .monospacedDigit()
-                }
-                .frame(maxWidth: .infinity)
-     
-                Rectangle()
-                    .fill(Color.white.opacity(0.12))
-                    .frame(width: 1, height: 32)
-     
-                VStack(spacing: 3) {
-                    Text("OVERTIRED")
-                        .font(.system(size: 8, weight: .bold))
-                        .foregroundStyle(Color.white.opacity(0.4))
-                        .tracking(0.4)
-                    Text(overtiredRiskTime.map { shortTime($0) } ?? "–")
-                        .font(.system(size: 13, weight: .bold, design: .rounded))
-                        .foregroundStyle(Color(red: 1.0, green: 0.65, blue: 0.3))
-                        .monospacedDigit()
-                }
-                .frame(maxWidth: .infinity)
+
+        private var ringProgress: Double {
+            switch currentThemeKind {
+            case .nextNap, .overdueNap, .overtired:
+                return Double(confidencePercent) / 100.0
+            case .bedtimeApproaching:
+                let total = 4 * 60
+                let elapsed = total - minutesUntilBedtime
+                return min(1.0, max(0, Double(elapsed) / Double(total)))
+            case .nightMode:
+                return 1.0
             }
-            .padding(.vertical, 10)
-            .background(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(Color.white.opacity(0.07))
-            )
         }
-     
+
+        private var ringLabel: String {
+            switch currentThemeKind {
+            case .nextNap, .overdueNap:      return "\(confidencePercent)%"
+            case .bedtimeApproaching: return countdownShort
+            case .nightMode:          return "🌙"
+            case .overtired:          return "!"
+            }
+        }
+
+        private var ringSubLabel: String {
+            switch currentThemeKind {
+            case .nextNap, .overdueNap:      return "conf."
+            case .bedtimeApproaching: return "to bed"
+            case .nightMode:          return "sleep"
+            case .overtired:          return "urgent"
+            }
+        }
+
+        private func bottomRow(_ t: CardTheme) -> some View {
+            HStack(spacing: 8) {
+                HStack(spacing: 6) {
+                    Image(systemName: bottomIcon)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(t.bottomTextColor)
+                    Text(bottomLeftText)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(t.bottomTextColor)
+                }
+                Spacer()
+                Text(bottomRightText)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(t.labelColor)
+            }
+            .padding(.horizontal, 18)
+            .padding(.vertical, 12)
+        }
+
+        private var bottomIcon: String {
+            switch currentThemeKind {
+            case .nextNap:            return "moon.fill"
+            case .overdueNap:         return "exclamationmark.triangle"
+            case .bedtimeApproaching: return "moon.stars"
+            case .nightMode:          return "waveform.path"
+            case .overtired:          return "exclamationmark.triangle.fill"
+            }
+        }
+
+        private var bottomLeftText: String {
+            switch currentThemeKind {
+            case .nextNap:            return "Nap soon"
+            case .overdueNap:         return "Tap to log nap now"
+            case .bedtimeApproaching, .nightMode:
+                if let end = bedtimeWindowEnd {
+                    return "Earliest \(ampm(displayTime)) · Latest \(ampm(end))"
+                }
+                return "Bedtime window"
+            case .overtired:          return "Overtired — act now"
+            }
+        }
+
+        private var bottomRightText: String {
+            switch currentThemeKind {
+            case .nextNap:            return "Window: \(windowText)"
+            case .overdueNap:         return "Log now →"
+            case .bedtimeApproaching:
+                if let risk = overtiredRiskTime { return "Overtired after \(ampm(risk))" }
+                return ""
+            case .nightMode:
+                if let risk = overtiredRiskTime { return "Risk: \(ampm(risk))" }
+                return "Good night 🌙"
+            case .overtired:          return "Sleep immediately"
+            }
+        }
+
+        private var starsLayer: some View {
+            GeometryReader { geo in
+                let w = geo.size.width
+                let h = geo.size.height
+                ZStack {
+                    Circle().fill(Color.white).frame(width: 2.5, height: 2.5).position(x: w * 0.15, y: h * 0.22).opacity(starOpacity1)
+                    Circle().fill(Color.white).frame(width: 1.5, height: 1.5).position(x: w * 0.75, y: h * 0.15).opacity(starOpacity2)
+                    Circle().fill(Color.white).frame(width: 2, height: 2).position(x: w * 0.88, y: h * 0.40).opacity(starOpacity3)
+                    Circle().fill(Color.white).frame(width: 1.5, height: 1.5).position(x: w * 0.25, y: h * 0.70).opacity(starOpacity2)
+                    Circle().fill(Color.white).frame(width: 1, height: 1).position(x: w * 0.60, y: h * 0.25).opacity(starOpacity1)
+                    Image(systemName: "moon.stars.fill")
+                        .font(.system(size: 56, weight: .thin))
+                        .foregroundStyle(LinearGradient(
+                            colors: [Color.white.opacity(0.06), Color.white.opacity(0.03)],
+                            startPoint: .topLeading, endPoint: .bottomTrailing
+                        ))
+                        .position(x: w * 0.82, y: h * 0.38)
+                }
+            }
+        }
+
         // MARK: - Helpers
-     
-        private var dividerLine: some View {
-            Rectangle()
-                .fill(Color(red: 0.35, green: 0.25, blue: 0.80).opacity(0.15))
-                .frame(width: 1, height: 32)
-        }
-     
+
         private var countdownText: String {
-            let mins = minutesUntilBedtime
-            if mins >= 60 {
-                let h = mins / 60
-                let m = mins % 60
-                return m == 0 ? "\(h)h until bedtime" : "\(h)h \(m)m until bedtime"
+            let m = minutesUntilBedtime
+            if m >= 60 {
+                let h = m / 60; let r = m % 60
+                return r == 0 ? "\(h)h until bedtime" : "\(h)h \(r)m until bedtime"
             }
-            return "\(mins)m until bedtime"
+            return "\(m)m until bedtime"
         }
-     
-        private func shortTime(_ date: Date) -> String {
+
+        private var countdownShort: String {
+            let m = minutesUntilBedtime
+            if m >= 60 { return "\(m/60)h\(m%60 > 0 ? "\(m%60)m" : "")" }
+            return "\(m)m"
+        }
+
+        private func ampm(_ date: Date) -> String {
             let f = DateFormatter()
             f.locale = Locale(identifier: "en_US_POSIX")
             f.dateFormat = "h:mm a"
             return f.string(from: date)
         }
-    }
 
+        // MARK: - Static Themes
 
-    private var ongoingNightSleep: SleepRecord? {
-        records.first { $0.kind == .nightSleep && $0.isOngoing }
-    }
+        struct CardTheme {
+            let gradientTop: Color
+            let gradientBot: Color
+            let borderColor: Color
+            let shadowColor: Color
+            let labelColor: Color
+            let titleColor: Color
+            let subtitleColor: Color
+            let ringTrack: Color
+            let ringFill: [Color]
+            let ringTextColor: Color
+            let bottomTextColor: Color
+            let labelText: String
+            let iconName: String
+            let showStars: Bool
+            let showPulseDot: Bool
+        }
 
-    private var stillSleepingCard: some View {
-        NightWatchCard(
-            ongoingNight: ongoingNightSleep,
-            expectedWakeTime: typicalWakeDate
+        private static let nextNap = CardTheme(
+            gradientTop: Color(red: 0.28, green: 0.18, blue: 0.65),
+            gradientBot: Color(red: 0.20, green: 0.12, blue: 0.50),
+            borderColor: Color(red: 0.55, green: 0.45, blue: 0.98).opacity(0.35),
+            shadowColor: Color(red: 0.20, green: 0.12, blue: 0.50).opacity(0.55),
+            labelColor: Color(red: 0.80, green: 0.74, blue: 1.0),
+            titleColor: .white,
+            subtitleColor: Color(red: 0.80, green: 0.74, blue: 1.0).opacity(0.85),
+            ringTrack: Color.white.opacity(0.10),
+            ringFill: [Color(red: 0.72, green: 0.65, blue: 0.98).opacity(0.6), Color(red: 0.72, green: 0.65, blue: 0.98), .white],
+            ringTextColor: .white,
+            bottomTextColor: Color(red: 0.72, green: 0.65, blue: 0.98).opacity(0.8),
+            labelText: "NEXT NAP", iconName: "moon.fill", showStars: false, showPulseDot: true
+        )
+
+        private static let overdueNap = CardTheme(
+            gradientTop: Color(red: 0.52, green: 0.25, blue: 0.04),
+            gradientBot: Color(red: 0.38, green: 0.16, blue: 0.02),
+            borderColor: Color.orange.opacity(0.4),
+            shadowColor: Color(red: 0.38, green: 0.16, blue: 0.02).opacity(0.55),
+            labelColor: Color(red: 1.0, green: 0.72, blue: 0.3),
+            titleColor: .white,
+            subtitleColor: Color(red: 1.0, green: 0.72, blue: 0.3).opacity(0.85),
+            ringTrack: Color.white.opacity(0.10),
+            ringFill: [Color.orange.opacity(0.6), Color.orange, .white],
+            ringTextColor: .white,
+            bottomTextColor: Color(red: 1.0, green: 0.72, blue: 0.3).opacity(0.8),
+            labelText: "NAP WINDOW PASSED", iconName: "exclamationmark.triangle.fill", showStars: false, showPulseDot: true
+        )
+
+        private static let bedtimeApproaching = CardTheme(
+            gradientTop: Color(red: 0.22, green: 0.14, blue: 0.52),
+            gradientBot: Color(red: 0.15, green: 0.09, blue: 0.38),
+            borderColor: Color(red: 0.45, green: 0.35, blue: 0.88).opacity(0.35),
+            shadowColor: Color(red: 0.15, green: 0.09, blue: 0.38).opacity(0.55),
+            labelColor: Color(red: 0.72, green: 0.65, blue: 0.98),
+            titleColor: .white,
+            subtitleColor: Color(red: 0.72, green: 0.65, blue: 0.98).opacity(0.85),
+            ringTrack: Color.white.opacity(0.10),
+            ringFill: [Color(red: 0.72, green: 0.65, blue: 0.98).opacity(0.6), Color(red: 0.72, green: 0.65, blue: 0.98), .white],
+            ringTextColor: .white,
+            bottomTextColor: Color(red: 0.72, green: 0.65, blue: 0.98).opacity(0.8),
+            labelText: "BEDTIME", iconName: "moon.stars.fill", showStars: true, showPulseDot: false
+        )
+
+        private static let nightMode = CardTheme(
+            gradientTop: Color(red: 0.12, green: 0.08, blue: 0.35),
+            gradientBot: Color(red: 0.08, green: 0.05, blue: 0.25),
+            borderColor: Color(red: 0.32, green: 0.22, blue: 0.72).opacity(0.4),
+            shadowColor: Color(red: 0.08, green: 0.05, blue: 0.25).opacity(0.6),
+            labelColor: Color(red: 0.72, green: 0.65, blue: 0.98),
+            titleColor: .white,
+            subtitleColor: Color(red: 0.72, green: 0.65, blue: 0.98).opacity(0.85),
+            ringTrack: Color.white.opacity(0.10),
+            ringFill: [Color(red: 0.72, green: 0.65, blue: 0.98).opacity(0.6), Color(red: 0.72, green: 0.65, blue: 0.98), .white],
+            ringTextColor: .white,
+            bottomTextColor: Color(red: 0.72, green: 0.65, blue: 0.98).opacity(0.8),
+            labelText: "BEDTIME", iconName: "moon.stars.fill", showStars: true, showPulseDot: true
+        )
+
+        private static let overtired = CardTheme(
+            gradientTop: Color(red: 0.50, green: 0.06, blue: 0.06),
+            gradientBot: Color(red: 0.35, green: 0.04, blue: 0.04),
+            borderColor: Color.red.opacity(0.4),
+            shadowColor: Color(red: 0.35, green: 0.04, blue: 0.04).opacity(0.55),
+            labelColor: Color(red: 1.0, green: 0.72, blue: 0.3),
+            titleColor: .white,
+            subtitleColor: Color(red: 1.0, green: 0.72, blue: 0.3).opacity(0.85),
+            ringTrack: Color.white.opacity(0.10),
+            ringFill: [Color.red.opacity(0.6), Color.red, .white],
+            ringTextColor: .white,
+            bottomTextColor: Color(red: 1.0, green: 0.72, blue: 0.3).opacity(0.8),
+            labelText: "OVERTIRED RISK", iconName: "exclamationmark.triangle.fill", showStars: false, showPulseDot: true
         )
     }
-    
-    private var typicalWakeDate: Date {
-        let wakeHour   = UserDefaults.standard.object(forKey: "typicalWakeHour")   as? Double ?? 7.0
-        let wakeMinute = UserDefaults.standard.object(forKey: "typicalWakeMinute") as? Double ?? 0.0
-        let today = Calendar.current.startOfDay(for: Date())
-        return Calendar.current.date(
-            bySettingHour: Int(wakeHour), minute: Int(wakeMinute), second: 0, of: today
-        ) ?? Date()
-    }
+
     // MARK: - NightWatchCard Component
 
     struct NightWatchCard: View {
-
         let ongoingNight: SleepRecord?
         let expectedWakeTime: Date
 
@@ -1438,52 +1367,36 @@ struct SleepListView: View {
         private let lilac      = Color(red: 0.72, green: 0.65, blue: 0.98)
         private let gold       = Color(red: 1.0,  green: 0.80, blue: 0.30)
 
-        // Başlangıç saati
         private var startTime: Date {
-            ongoingNight?.date ?? Calendar.current.date(
-                byAdding: .hour, value: -9, to: expectedWakeTime
-            ) ?? Date()
+            ongoingNight?.date ?? Calendar.current.date(byAdding: .hour, value: -9, to: expectedWakeTime) ?? Date()
         }
 
-        // Geçen süre (dk)
         private var elapsedMinutes: Int {
             max(0, Int(Date().timeIntervalSince(startTime) / 60))
         }
 
-        // Beklenen toplam gece uykusu (dk) — 10 saat default
         private var expectedMinutes: Int {
             max(1, Int(expectedWakeTime.timeIntervalSince(startTime) / 60))
         }
 
-        // Progress 0.0 – 1.0
         private var progress: Double {
             min(1.0, Double(elapsedMinutes) / Double(expectedMinutes))
         }
 
-        // Confidence benzeri yüzde — geçen/beklenen
         private var progressPercent: Int {
             Int(progress * 100)
         }
 
         var body: some View {
             ZStack {
-                // Arka plan gradient
                 RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                Color(red: 0.12, green: 0.08, blue: 0.35),
-                                Color(red: 0.08, green: 0.05, blue: 0.25)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
+                    .fill(LinearGradient(
+                        colors: [Color(red: 0.12, green: 0.08, blue: 0.35), Color(red: 0.08, green: 0.05, blue: 0.25)],
+                        startPoint: .topLeading, endPoint: .bottomTrailing
+                    ))
 
-                // Yıldız texture
                 starsLayer
 
-                // İçerik
                 VStack(spacing: 0) {
                     topRow
                     Divider()
@@ -1500,43 +1413,27 @@ struct SleepListView: View {
             .shadow(color: deepPurple.opacity(0.6), radius: 16, x: 0, y: 8)
             .onAppear {
                 pulse = true
-                withAnimation(.easeInOut(duration: 2.1).repeatForever(autoreverses: true)) {
-                    starOpacity1 = 0.9
-                }
-                withAnimation(.easeInOut(duration: 1.6).repeatForever(autoreverses: true).delay(0.4)) {
-                    starOpacity2 = 0.2
-                }
-                withAnimation(.easeInOut(duration: 2.5).repeatForever(autoreverses: true).delay(0.9)) {
-                    starOpacity3 = 0.8
-                }
+                withAnimation(.easeInOut(duration: 2.1).repeatForever(autoreverses: true)) { starOpacity1 = 0.9 }
+                withAnimation(.easeInOut(duration: 1.6).repeatForever(autoreverses: true).delay(0.4)) { starOpacity2 = 0.2 }
+                withAnimation(.easeInOut(duration: 2.5).repeatForever(autoreverses: true).delay(0.9)) { starOpacity3 = 0.8 }
             }
         }
 
-        // MARK: - Top Row
-
         private var topRow: some View {
             HStack(alignment: .center, spacing: 16) {
-
-                // Sol: başlangıç saati + beklenen uyanış
                 VStack(alignment: .leading, spacing: 6) {
-
-                    // "CURRENT SLEEP SESSION" etiketi
                     HStack(spacing: 5) {
                         Circle()
                             .fill(lilac)
                             .frame(width: 6, height: 6)
                             .scaleEffect(pulse ? 1.4 : 0.8)
-                            .animation(
-                                .easeInOut(duration: 0.9).repeatForever(autoreverses: true),
-                                value: pulse
-                            )
+                            .animation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true), value: pulse)
                         Text("CURRENT SLEEP SESSION")
                             .font(.system(size: 10, weight: .bold))
                             .foregroundStyle(lilac)
                             .tracking(0.5)
                     }
 
-                    // Başlangıç saati
                     TimelineView(.periodic(from: .now, by: 60)) { _ in
                         Text("Started \(ampm(startTime))")
                             .font(.system(size: 22, weight: .bold, design: .rounded))
@@ -1544,7 +1441,6 @@ struct SleepListView: View {
                             .monospacedDigit()
                     }
 
-                    // Beklenen uyanış
                     HStack(spacing: 4) {
                         Image(systemName: "sunrise.fill")
                             .font(.system(size: 11, weight: .semibold))
@@ -1554,10 +1450,7 @@ struct SleepListView: View {
                             .foregroundStyle(gold)
                     }
                 }
-
                 Spacer()
-
-                // Sağ: dairesel progress
                 circularProgress
             }
             .padding(.horizontal, 18)
@@ -1565,30 +1458,22 @@ struct SleepListView: View {
             .padding(.bottom, 14)
         }
 
-        // MARK: - Circular Progress
-
         private var circularProgress: some View {
             ZStack {
-                // Track
                 Circle()
                     .stroke(Color.white.opacity(0.10), lineWidth: 5)
                     .frame(width: 72, height: 72)
 
-                // Progress arc
                 Circle()
                     .trim(from: 0, to: progress)
                     .stroke(
-                        AngularGradient(
-                            colors: [lilac.opacity(0.6), lilac, Color.white],
-                            center: .center
-                        ),
+                        AngularGradient(colors: [lilac.opacity(0.6), lilac, Color.white], center: .center),
                         style: StrokeStyle(lineWidth: 5, lineCap: .round)
                     )
                     .frame(width: 72, height: 72)
                     .rotationEffect(.degrees(-90))
                     .animation(.easeInOut(duration: 1.0), value: progress)
 
-                // İçerik
                 VStack(spacing: 1) {
                     TimelineView(.periodic(from: .now, by: 60)) { _ in
                         Text("\(progressPercent)%")
@@ -1603,11 +1488,8 @@ struct SleepListView: View {
             }
         }
 
-        // MARK: - Bottom Row
-
         private var bottomRow: some View {
             HStack(spacing: 8) {
-                // Sol: geçen süre
                 HStack(spacing: 6) {
                     Image(systemName: "waveform.path")
                         .font(.system(size: 12, weight: .semibold))
@@ -1619,10 +1501,7 @@ struct SleepListView: View {
                             .foregroundStyle(lilac.opacity(0.85))
                     }
                 }
-
                 Spacer()
-
-                // Sağ: kalan süre
                 TimelineView(.periodic(from: .now, by: 60)) { _ in
                     let remaining = max(0, expectedMinutes - elapsedMinutes)
                     Text(remaining > 0 ? "~\(TimeFormat.minutes(remaining)) left" : "Wake time soon")
@@ -1634,62 +1513,26 @@ struct SleepListView: View {
             .padding(.vertical, 12)
         }
 
-        // MARK: - Stars
-
         private var starsLayer: some View {
             GeometryReader { geo in
                 let w = geo.size.width
                 let h = geo.size.height
                 ZStack {
-                    Circle()
-                        .fill(Color.white)
-                        .frame(width: 2.5, height: 2.5)
-                        .position(x: w * 0.15, y: h * 0.22)
-                        .opacity(starOpacity1)
-
-                    Circle()
-                        .fill(Color.white)
-                        .frame(width: 1.5, height: 1.5)
-                        .position(x: w * 0.75, y: h * 0.15)
-                        .opacity(starOpacity2)
-
-                    Circle()
-                        .fill(Color.white)
-                        .frame(width: 2, height: 2)
-                        .position(x: w * 0.88, y: h * 0.40)
-                        .opacity(starOpacity3)
-
-                    Circle()
-                        .fill(Color.white)
-                        .frame(width: 1.5, height: 1.5)
-                        .position(x: w * 0.25, y: h * 0.70)
-                        .opacity(starOpacity2)
-
-                    Circle()
-                        .fill(Color.white)
-                        .frame(width: 1, height: 1)
-                        .position(x: w * 0.60, y: h * 0.25)
-                        .opacity(starOpacity1)
-
-                    // Ay ikonu
+                    Circle().fill(Color.white).frame(width: 2.5, height: 2.5).position(x: w * 0.15, y: h * 0.22).opacity(starOpacity1)
+                    Circle().fill(Color.white).frame(width: 1.5, height: 1.5).position(x: w * 0.75, y: h * 0.15).opacity(starOpacity2)
+                    Circle().fill(Color.white).frame(width: 2, height: 2).position(x: w * 0.88, y: h * 0.40).opacity(starOpacity3)
+                    Circle().fill(Color.white).frame(width: 1.5, height: 1.5).position(x: w * 0.25, y: h * 0.70).opacity(starOpacity2)
+                    Circle().fill(Color.white).frame(width: 1, height: 1).position(x: w * 0.60, y: h * 0.25).opacity(starOpacity1)
                     Image(systemName: "moon.stars.fill")
                         .font(.system(size: 56, weight: .thin))
-                        .foregroundStyle(
-                            LinearGradient(
-                                colors: [
-                                    Color.white.opacity(0.06),
-                                    Color.white.opacity(0.03)
-                                ],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
+                        .foregroundStyle(LinearGradient(
+                            colors: [Color.white.opacity(0.06), Color.white.opacity(0.03)],
+                            startPoint: .topLeading, endPoint: .bottomTrailing
+                        ))
                         .position(x: w * 0.82, y: h * 0.38)
                 }
             }
         }
-
-        // MARK: - Helper
 
         private func ampm(_ date: Date) -> String {
             let f = DateFormatter()
